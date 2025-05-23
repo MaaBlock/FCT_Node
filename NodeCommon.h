@@ -7,7 +7,21 @@
 #include "./NodeEnvironment.h"
 
 namespace FCT {
-
+    template<typename T>
+    class MouduleManager
+    {
+    public:
+        MouduleManager()
+        {
+            std::cout << "MouduleManager Init" << std::endl;
+            T::Init();
+        }
+        ~MouduleManager()
+        {
+            std::cout << "MouduleManager Term" << std::endl;
+            T::Term();
+        }
+    };
     class NodeCommon
     {
     private:
@@ -46,7 +60,7 @@ namespace FCT {
             v8::V8::Initialize();
             g_platform = std::move(platform);
         }
-        static void term()
+        static void Term()
         {
             v8::V8::Dispose();
             v8::V8::DisposePlatform();
@@ -56,9 +70,8 @@ namespace FCT {
         {
 
         }
-
     };
-
+    extern MouduleManager<NodeCommon> _nodeCommonManager;
 } // FCT
 
 #endif //NODECOMMON_H
