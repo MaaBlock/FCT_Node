@@ -9,6 +9,8 @@ add_subdirectory(node)
 
 add_library(FCT_Node STATIC
         headers.cpp
+        NodeCommon.cpp
+        NodeEnvironment.cpp
 )
 
 target_include_directories(FCT_Node PUBLIC
