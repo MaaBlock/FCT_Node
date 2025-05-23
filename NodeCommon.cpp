@@ -7,4 +7,5 @@
 namespace FCT {
     std::shared_ptr<node::InitializationResult> NodeCommon::g_initializationResultl = nullptr;
     std::unique_ptr<node::MultiIsolatePlatform> NodeCommon::g_platform;
+    MouduleManager<NodeCommon> _nodeCommonManager = MouduleManager<NodeCommon>();
 } // FCT
