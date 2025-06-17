@@ -4,15 +4,29 @@
 
 #ifndef NODEENVIRONMENT_H
 #define NODEENVIRONMENT_H
-
+#include "JSObject.h"
 namespace FCT {
+/*todo:
+ *  1. 完成CodeFrom
+ *
+ *
+ */
 
     int GetOptimalNodeThreadPoolSize();
-
+    enum class CodeFrom
+    {
+        file,
+        arg,
+        string
+    };
+    struct NodeEnvTicker
+    {
+        std::function<void()> cb;
+    };
     class NodeEnvironment
     {
     protected:
-        std::unique_ptr<node::CommonEnvironmentSetup> m_setup;
+        //std::unique_ptr<node::CommonEnvironmentSetup> m_setup;
         v8::Isolate* m_isolate = nullptr;
         node::Environment* m_env = nullptr;
         std::thread m_eventLoopThread;
@@ -22,103 +36,75 @@ namespace FCT {
         std::vector<std::string> m_excuteArgs;
         std::vector<std::string> m_modulePaths;
         bool m_environmentInitialized = false;
+        CodeFrom m_codeFrom = CodeFrom::arg;
+        std::string m_jsCode;
+        uint32_t m_codeArgIndex = 1;
+        std::string m_codeFilePath;
+        std::string m_setupJSCode;
+        v8::Global<v8::Value> m_setupRet;
+
+        std::atomic<bool> m_eventLoopRunning{false};
+        boost::lockfree::queue<NodeEnvTicker*,boost::lockfree::capacity<1024>> m_tickerQueue;
+        std::thread m_pollThread;
+        bool m_pollThreadRunning = false;
+        std::atomic<bool> m_embedSem = false;
+        uv_sem_t m_uvEmbedSem;
+        uv_loop_t* m_loop = nullptr;
+
+        v8::Global<v8::Context> m_context;
+        std::unique_ptr<node::ArrayBufferAllocator> m_arrayBufferAllocator;
+        uv_thread_t m_pollThreadId;
+
+    protected:
+        void weakMainThread();
+        void beginPollThread();
+        void generateSetupJSCode();
+        void excuteSetupJSCode();
+        void processEvents(int timeoutMs);
+        void runEventLoopInThread();
+        void runEventLoopInThread(int timeoutMs);
+        void stopEventLoop();
+        void runEventLoopOnce();
     public:
         bool setup();
         bool executeArg();
         void stop();
+        void tick();
     public:
-        NodeEnvironment() = default;
+        void init();
+        NodeEnvironment()
+        {
+            init();
+        }
+        void code(std::string jsCode)
+        {
+            m_codeFrom = CodeFrom::string;
+            m_jsCode = jsCode;
+        }
         void args(const std::vector<std::string> args);
         void excuteArgs(const std::vector<std::string> executeArgs);
         void addModulePath(const std::string& path);
+        void processEvents(v8::Locker& locker, v8::Isolate::Scope& isolate_scope, v8::HandleScope& handle_scope,
+                           v8::Context::Scope& context_scope);
         int excute();
         bool execute(std::string_view jsCode);
         std::string base64Encode(const std::string& input);
+        void pollEvents();
+        void PollEvents();
+        void blockRunLoop();
         void callFunction(const std::string& funcName, const std::vector<v8::Local<v8::Value>>& args);
         void callFunction(const std::string& funcName);
         template<typename ReturnType, typename... Args>
         ReturnType callFunction(const std::string& funcName, Args... args);
+        template<typename... Args>
+        JSObject callFunction(const std::string& funcName, Args... args);
+        v8::Isolate* isolate() const { return m_isolate; }
+        v8::Local<v8::Context> context() const
+        {
+            return v8::Local<v8::Context>::New(m_isolate, m_context);
+        }
     };
-    template<typename T>
-    T convertFromJS(v8::Isolate* isolate, v8::Local<v8::Value> jsValue) {
-        return T();
-    }
 
-    template<>
-    inline bool convertFromJS<bool>(v8::Isolate* isolate, v8::Local<v8::Value> jsValue) {
-        if (jsValue->IsBoolean()) {
-            return jsValue->BooleanValue(isolate);
-        }
-        return false;
-    }
-
-    template<typename T>
-    v8::Local<v8::Value> convertToJS(v8::Isolate* isolate,T arg)
-    {
-        return v8::Undefined(isolate);
-    }
-    template<>
-    inline v8::Local<v8::Value> convertToJS<const std::string&>(v8::Isolate* isolate,const std::string& arg)
-    {
-        return v8::String::NewFromUtf8(isolate, arg.c_str()).ToLocalChecked();
-    }
-    template<>
-    inline v8::Local<v8::Value> convertToJS<const char*>(v8::Isolate* isolate, const char* arg) {
-        return v8::String::NewFromUtf8(isolate, arg).ToLocalChecked();
-    }
-    template<typename ReturnType, typename... Args>
-    ReturnType NodeEnvironment::callFunction(const std::string& funcName, Args... args)
-    {
-        if (!m_setup || !m_isolate || !m_env) {
-            std::cerr << "Environment not properly set up. Call setup() first." << std::endl;
-            return ReturnType();
-        }
-
-        v8::Locker locker(m_isolate);
-        v8::Isolate::Scope isolate_scope(m_isolate);
-        v8::HandleScope handle_scope(m_isolate);
-        v8::Local<v8::Context> context = m_setup->context();
-        v8::Context::Scope context_scope(context);
-
-        v8::Local<v8::Object> global = context->Global();
-
-        v8::Local<v8::String> func_name = v8::String::NewFromUtf8(m_isolate, funcName.c_str(),
-                                                                 v8::NewStringType::kNormal).ToLocalChecked();
-        v8::MaybeLocal<v8::Value> maybe_func = global->Get(context, func_name);
-
-        if (maybe_func.IsEmpty()) {
-            std::cerr << "Function '" << funcName << "' not found in global scope" << std::endl;
-            return ReturnType();
-        }
-
-        v8::Local<v8::Value> func_val = maybe_func.ToLocalChecked();
-        if (!func_val->IsFunction()) {
-            std::cerr << "'" << funcName << "' is not a function" << std::endl;
-            return ReturnType();
-        }
-
-        v8::Local<v8::Function> func = v8::Local<v8::Function>::Cast(func_val);
-
-        std::vector<v8::Local<v8::Value>> jsArgs = { convertToJS(m_isolate, args)... };
-
-        node::async_context asyncContext = { 0, 0 };
-        v8::MaybeLocal<v8::Value> result = node::MakeCallback(
-            m_isolate,
-            global,
-            func,
-            static_cast<int>(jsArgs.size()),
-            jsArgs.empty() ? nullptr : jsArgs.data(),
-            asyncContext);
-
-        if (result.IsEmpty()) {
-            std::cerr << "Error calling function '" << funcName << "'" << std::endl;
-            return ReturnType();
-        }
-
-        m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
-
-        return convertFromJS<ReturnType>(m_isolate,result.ToLocalChecked());
-    }
 } // FCT
-
+//todo:封装一个 jobeject，然后支持  obj[property] 来访问字段
 #endif //NODEENVIRONMENT_H

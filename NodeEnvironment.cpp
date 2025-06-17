@@ -30,6 +30,234 @@ namespace FCT {
         m_modulePaths.push_back(path);
     }
 
+    void NodeEnvironment::init()
+    {
+        auto platform = NodeCommon::GetPlatform().get();
+        if (!platform) {
+            std::cerr << "Failed to get Node.js platform" << std::endl;
+            return;
+        }
+
+        uv_loop_t* loop = new uv_loop_t;
+        int result = uv_loop_init(loop);
+        if (result != 0) {
+            std::cerr << "Failed to initialize event loop: " << uv_strerror(result) << std::endl;
+            delete loop;
+            return;
+        }
+        m_loop = loop;
+
+        m_arrayBufferAllocator = node::ArrayBufferAllocator::Create();
+
+        m_isolate = node::NewIsolate(m_arrayBufferAllocator.get(),m_loop,platform);
+        if (!m_isolate) {
+            std::cerr << "Failed to create V8 Isolate" << std::endl;
+            uv_loop_close(m_loop);
+            delete m_loop;
+            m_loop = nullptr;
+            return;
+        }
+
+
+        m_isolate->SetData(0, this);
+
+
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        v8::HandleScope handle_scope(m_isolate);
+
+        v8::Local<v8::Context> context = node::NewContext(m_isolate);
+
+        m_context.Reset(m_isolate, context);
+
+        std::cout << "V8 Isolate, event loop and context initialized successfully" << std::endl;
+}
+
+    void NodeEnvironment::weakMainThread()
+    {
+        NodeEnvTicker* ticker = new NodeEnvTicker();
+        ticker->cb = [this,ticker]()
+        {
+            v8::Locker locker(m_isolate);
+            v8::Isolate::Scope isolate_scope(m_isolate);
+            v8::HandleScope handle_scope(m_isolate);
+            v8::Context::Scope context_scope(this->context());
+            this->runEventLoopOnce();
+            m_embedSem = true;
+            delete ticker;
+        };
+        m_tickerQueue.push(ticker);
+    }
+
+    void NodeEnvironment::beginPollThread()
+    {
+        m_embedSem = false;
+        m_pollThreadRunning = true;
+        uv_sem_init(&m_uvEmbedSem,0);
+        uv_thread_create(&m_pollThreadId, [](void* arg)
+        {
+            auto* pThis = static_cast<NodeEnvironment*>(arg);
+            while (pThis->m_pollThreadRunning)
+            {
+                uv_sem_wait(&pThis->m_uvEmbedSem);
+                /*
+                while (!pThis->m_embedSem)
+                {
+                    std::this_thread::sleep_for(
+                        std::chrono::milliseconds(1));
+                }*/
+                pThis->m_embedSem = false;
+                pThis->pollEvents();
+                pThis->weakMainThread();
+            }
+        }, this);
+        /*
+        m_pollThread = std::thread([this]()
+        {
+           while (m_pollThreadRunning)
+            {
+                while (!m_embedSem)
+                {
+                    std::this_thread::sleep_for(
+                        std::chrono::milliseconds(1));
+                }
+                m_embedSem = false;
+                pollEvents();
+                weakMainThread();
+            }
+        });*/
+        runEventLoopOnce();
+    }
+
+    void NodeEnvironment::excuteSetupJSCode()
+    {
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        v8::HandleScope handle_scope(m_isolate);
+        v8::Context::Scope context_scope(this->context());
+
+        std::string setupModulePaths = "";
+        for (const auto& path : m_modulePaths) {
+            setupModulePaths += "module.paths.push('" + path + "');\n";
+        }
+
+        std::string initCode = R"(
+const publicRequire = require('node:module').createRequire(process.cwd() + '/');
+globalThis.require = publicRequire;
+
+)" + setupModulePaths + R"(
+
+globalThis.__FCT_executeScriptBase64 = function(codeBase64) {
+    const vm = require('node:vm');
+    try {
+        const code = Buffer.from(codeBase64, 'base64').toString('utf8');
+        const result = vm.runInThisContext(code, {
+            filename: 'user_script.js',
+            displayErrors: true
+        });
+        return result;
+    } catch (error) {
+        console.error('Error executing script:', error);
+        return { error: error.message };
+    }
+};
+globalThis.__FCT_executeScriptString = function(code) {
+    const vm = require('node:vm');
+    try {
+        const result = vm.runInThisContext(code, {
+            filename: 'user_script.js',
+            displayErrors: true
+        });
+        return result;
+    } catch (error) {
+        console.error('Error executing script:', error);
+        return { error: error.message };
+    }
+};
+
+console.log('FCT Node.js environment initialized');
+)";
+
+        /*v8::MaybeLocal<v8::Value> init_ret = node::LoadEnvironment(m_env, initCode);
+
+        if (init_ret.IsEmpty()) {
+            std::cerr << "Failed to initialize JavaScript environment" << std::endl;
+            return;
+        }*/
+
+        switch (m_codeFrom)
+        {
+        case CodeFrom::file:
+
+            break;
+        case CodeFrom::arg:
+            {
+                std::string executeCode = "globalThis.__FCT_executeScriptString(process.argv[" +
+                                         std::to_string(m_codeArgIndex) + "]);";
+                v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, executeCode);
+                if (!exec_ret.IsEmpty()) {
+                    v8::Local<v8::Value> localResult = exec_ret.ToLocalChecked();
+                    m_setupRet.Reset(m_isolate, localResult);
+                } else {
+                    std::cerr << "Failed to execute JavaScript code from arguments" << std::endl;
+                    return;
+                }
+                m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
+            }
+            break;
+        case CodeFrom::string:
+            {
+                std::string jsCodeStr(m_jsCode);
+                std::string base64Code = base64Encode(jsCodeStr);
+
+                std::string executeCode = "globalThis.__FCT_executeScriptBase64('" + base64Code + "');";
+
+                v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, initCode + executeCode);
+                v8::Local<v8::Value> localResult = exec_ret.ToLocalChecked();
+                m_setupRet.Reset(m_isolate,localResult);
+                break;
+            }
+        }
+
+        beginPollThread();
+    }
+
+    void NodeEnvironment::stopEventLoop() {
+        m_eventLoopRunning.store(false);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    }
+
+    void NodeEnvironment::runEventLoopOnce()
+    {
+
+        node::Environment* env = m_env;
+
+        if (!env)
+            return;
+
+
+        v8::Isolate::Scope IsolateScope(m_isolate);
+        v8::HandleScope handle_scope(m_isolate);
+        auto context = this->context();
+
+        v8::Context::Scope context_scope(context);
+
+        v8::TryCatch TryCatch(m_isolate);
+        {
+            //ExplicitMicrotasksScope microtasksScope(m_isolate,this->context()->GetMicrotaskQueue());
+            //context->GetMicrotaskQueue()->PerformCheckpoint(m_isolate);
+            m_isolate->PerformMicrotaskCheckpoint();
+
+            int r = uv_run(m_loop,UV_RUN_NOWAIT );
+           NodeCommon::GetPlatform()->DrainTasks(m_isolate);
+
+            uv_sem_post(&m_uvEmbedSem);
+            //m_embedSem = true;
+        }
+    }
+
     bool NodeEnvironment::setup()
     {
         auto platform = NodeCommon::GetPlatform().get();
@@ -45,7 +273,21 @@ namespace FCT {
             std::cout << "Exec Args: " << arg << std::endl;
         }
 
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        v8::HandleScope handle_scope(m_isolate);
+
+        auto* isolateData = node::CreateIsolateData(m_isolate, m_loop, platform);
+
+        v8::Local<v8::Context> context = this->context();
+
+        v8::Context::Scope ContextScope(context);
+        m_isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kExplicit);
+
+        m_env = node::CreateEnvironment(isolateData,context,m_args,m_excuteArgs,node::EnvironmentFlags::kOwnsProcessState);
+        /*
         std::vector<std::string> errors;
+
         m_setup = node::CommonEnvironmentSetup::Create(platform, &errors, args, exec_args);
         if (!m_setup) {
             for (const std::string& err : errors)
@@ -54,51 +296,17 @@ namespace FCT {
         }
 
         m_isolate = m_setup->isolate();
-        m_env = m_setup->env();
+        m_env = m_setup->env();*/
+        excuteSetupJSCode();
 
+
+        //beginPollThread();
         return true;
     }
 
-    bool NodeEnvironment::executeArg()
-    {
-        return execute("require('node:vm').runInThisContext(process.argv[1]);");
-
-        /*
-    if (!m_setup || !m_isolate || !m_env) {
-        std::cerr << "Environment not properly set up. Call setup() first." << std::endl;
-        return false;
-    }
-
-    v8::Locker locker(m_isolate);
-    v8::Isolate::Scope isolate_scope(m_isolate);
-    v8::HandleScope handle_scope(m_isolate);
-    v8::Context::Scope context_scope(m_setup->context());
-
-    std::string setupModulePaths = "";
-    for (const auto& path : m_modulePaths) {
-        setupModulePaths += "module.paths.push('" + path + "');\n";
-    }
-
-    v8::MaybeLocal<v8::Value> loadenv_ret = node::LoadEnvironment(
-        m_env,
-        "const publicRequire ="
-        "  require('node:module').createRequire(process.cwd() + '/');"
-        "globalThis.require = publicRequire;"
-        + setupModulePaths +
-        "require('node:vm').runInThisContext(process.argv[1]);");
-
-    if (loadenv_ret.IsEmpty())
-        return false;
-
-    m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
-    return true;
-    */
-}
-
-    /*
-bool NodeEnvironment::execute(std::string_view jsCode)
+    bool NodeEnvironment::execute(std::string_view jsCode)
 {
-    if (!m_setup || !m_isolate || !m_env) {
+    if (!m_isolate || !m_env) {
         if (!setup()) {
             return false;
         }
@@ -107,104 +315,25 @@ bool NodeEnvironment::execute(std::string_view jsCode)
     v8::Locker locker(m_isolate);
     v8::Isolate::Scope isolate_scope(m_isolate);
     v8::HandleScope handle_scope(m_isolate);
-    v8::Context::Scope context_scope(m_setup->context());
+    v8::Context::Scope context_scope(this->context());
 
-    std::string setupModulePaths = "";
-    for (const auto& path : m_modulePaths) {
-        setupModulePaths += "module.paths.push('" + path + "');\n";
-    }
-
-    std::string fullJsCode =
-        "const publicRequire = require('node:module').createRequire(process.cwd() + '/');"
-        "globalThis.require = publicRequire;"
-        + setupModulePaths
-        + std::string(jsCode);
-
-    v8::MaybeLocal<v8::Value> loadenv_ret = node::LoadEnvironment(m_env, fullJsCode);
-
-    if (loadenv_ret.IsEmpty())
-        return false;
-
-    m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
-    return true;
-} */
-    /*
-    bool NodeEnvironment::execute(std::string_view jsCode)
-    {
-        if (!m_setup || !m_isolate || !m_env) {
-            if (!setup()) {
-                return false;
-            }
-        }
-
-        v8::Locker locker(m_isolate);
-        v8::Isolate::Scope isolate_scope(m_isolate);
-        v8::HandleScope handle_scope(m_isolate);
-        v8::Context::Scope context_scope(m_setup->context());
-
-        std::string setupModulePaths = "";
-        for (const auto& path : m_modulePaths) {
-            setupModulePaths += "module.paths.push(`" + path + "`);\n";
-        }
-
-        std::string bootstrapCode = R"(
-const publicRequire = require('node:module').createRequire(process.cwd() + '/');
-globalThis.require = publicRequire;
-
-)" + setupModulePaths + R"(
-
-const vm = require('node:vm');
-
-const userCode = `)" + std::string(jsCode) + R"(`;
-
-vm.runInThisContext(userCode, { filename: 'user_script.js' });
-)";
-
-        v8::MaybeLocal<v8::Value> loadenv_ret = node::LoadEnvironment(m_env, bootstrapCode);
-
-        if (loadenv_ret.IsEmpty()) {
-            std::cerr << "Failed to execute JavaScript code" << std::endl;
-            return false;
-        }
-
-        m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
-        return true;
-    }
-    */
-    bool NodeEnvironment::execute(std::string_view jsCode)
-{
-    if (!m_setup || !m_isolate || !m_env) {
-        if (!setup()) {
-            return false;
-        }
-    }
-
-    v8::Locker locker(m_isolate);
-    v8::Isolate::Scope isolate_scope(m_isolate);
-    v8::HandleScope handle_scope(m_isolate);
-    v8::Context::Scope context_scope(m_setup->context());
-
-    if (!m_environmentInitialized) {
+    //if (!m_environmentInitialized) {
         std::string setupModulePaths = "";
         for (const auto& path : m_modulePaths) {
             setupModulePaths += "module.paths.push('" + path + "');\n";
         }
 
         std::string initCode = R"(
-// 设置全局 require
 const publicRequire = require('node:module').createRequire(process.cwd() + '/');
 globalThis.require = publicRequire;
 
 )" + setupModulePaths + R"(
 
+const vm = require('node:vm');
 globalThis.__FCT_executeScript = function(codeBase64) {
-    const vm = require('node:vm');
     try {
         const code = Buffer.from(codeBase64, 'base64').toString('utf8');
-        return vm.runInThisContext(code, {
-            filename: 'user_script.js',
-            displayErrors: true
-        });
+        return vm.runInThisContext(code);
     } catch (error) {
         console.error('Error executing script:', error);
         return { error: error.message };
@@ -212,24 +341,25 @@ globalThis.__FCT_executeScript = function(codeBase64) {
 };
 
 console.log('FCT Node.js environment initialized');
-)";
 
+)";
+/*
         v8::MaybeLocal<v8::Value> init_ret = node::LoadEnvironment(m_env, initCode);
 
         if (init_ret.IsEmpty()) {
             std::cerr << "Failed to initialize JavaScript environment" << std::endl;
             return false;
         }
-
+*/
         m_environmentInitialized = true;
-    }
+    //}
 
     std::string jsCodeStr(jsCode);
     std::string base64Code = base64Encode(jsCodeStr);
 
     std::string executeCode = "globalThis.__FCT_executeScript('" + base64Code + "');";
 
-    v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, executeCode);
+    v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, initCode + executeCode);
 
     if (exec_ret.IsEmpty()) {
         std::cerr << "Failed to execute JavaScript code" << std::endl;
@@ -285,17 +415,45 @@ std::string NodeEnvironment::base64Encode(const std::string& input) {
 
     return ret;
 }
+    void NodeEnvironment::pollEvents() {
+
+#ifdef _WIN32
+        DWORD bytes, timeout;
+        ULONG_PTR key;
+        OVERLAPPED* overlapped;
+
+        timeout = uv_backend_timeout(m_loop);
+
+        GetQueuedCompletionStatus(m_loop->iocp, &bytes, &key, &overlapped, timeout);
+
+        if (overlapped != nullptr)
+            PostQueuedCompletionStatus(m_loop->iocp, bytes, key, overlapped);
+#else
+
+#endif
+    }
+    void NodeEnvironment::blockRunLoop()
+    {
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        v8::HandleScope handle_scope(m_isolate);
+        v8::Context::Scope context_scope(this->context());
+        while (true)
+        {
+            pollEvents();
+            runEventLoopOnce();
+        }
+    }
 void NodeEnvironment::callFunction(const std::string& funcName, const std::vector<v8::Local<v8::Value>>& args)
 {
-    if (!m_setup || !m_isolate || !m_env) {
+    if (!m_isolate || !m_env) {
         std::cerr << "Environment not properly set up. Call setup() first." << std::endl;
         return;
     }
-
     v8::Locker locker(m_isolate);
     v8::Isolate::Scope isolate_scope(m_isolate);
     v8::HandleScope handle_scope(m_isolate);
-    v8::Local<v8::Context> context = m_setup->context();
+    v8::Local<v8::Context> context = this->context();
     v8::Context::Scope context_scope(context);
 
     v8::Local<v8::Object> global = context->Global();
@@ -335,24 +493,10 @@ void NodeEnvironment::callFunction(const std::string& funcName, const std::vecto
 
     m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
 }
-
 void NodeEnvironment::callFunction(const std::string& funcName)
 {
     std::vector<v8::Local<v8::Value>> args;
     callFunction(funcName, args);
-}
-
-    int NodeEnvironment::excute()
-{
-    if (!setup()) {
-        return 1;
-    }
-
-    if (!executeArg()) {
-        return 1;
-    }
-
-    return m_exitCode;
 }
 
 void NodeEnvironment::stop()
@@ -363,4 +507,14 @@ void NodeEnvironment::stop()
 
     node::Stop(m_env);
 }
+
+    void NodeEnvironment::tick()
+    {
+        while (!m_tickerQueue.empty())
+        {
+            NodeEnvTicker* ticker;
+            m_tickerQueue.pop(ticker);
+            ticker->cb();
+        }
+    }
 } // FCT

@@ -71,7 +71,7 @@ namespace FCT {
 
         }
     };
-    extern MouduleManager<NodeCommon> _nodeCommonManager;
+    //extern MouduleManager<NodeCommon> _nodeCommonManager;
 } // FCT
 
 #endif //NODECOMMON_H
