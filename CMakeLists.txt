@@ -11,7 +11,12 @@ add_library(FCT_Node STATIC
         headers.cpp
         NodeCommon.cpp
         NodeEnvironment.cpp
+        JSObject.cpp
+        JSPromise.cpp
+        ExplicitMicrotasksScope.cpp
 )
+
+find_package(Boost REQUIRED CONFIG)
 
 target_include_directories(FCT_Node PUBLIC
         ${NODE_INCLUDE_DIR}
@@ -19,7 +24,10 @@ target_include_directories(FCT_Node PUBLIC
         ${UV_INCLUDE_DIR}
 )
 
-target_link_libraries(FCT_Node PUBLIC nodejs_deps)
+target_link_libraries(FCT_Node PUBLIC
+        nodejs_deps
+        Boost::boost
+)
 
 if(DEFINED NODE_LIB_DIR)
     set(NODE_LIB_DIR ${NODE_LIB_DIR} PARENT_SCOPE)
