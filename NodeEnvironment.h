@@ -44,7 +44,7 @@ namespace FCT {
         v8::Global<v8::Value> m_setupRet;
 
         std::atomic<bool> m_eventLoopRunning{false};
-        boost::lockfree::queue<NodeEnvTicker*,boost::lockfree::capacity<1024>> m_tickerQueue;
+        moodycamel::ConcurrentQueue<NodeEnvTicker*> m_tickerQueue;
         std::thread m_pollThread;
         bool m_pollThreadRunning = false;
         std::atomic<bool> m_embedSem = false;

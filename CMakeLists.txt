@@ -16,8 +16,6 @@ add_library(FCT_Node STATIC
         ExplicitMicrotasksScope.cpp
 )
 
-find_package(Boost REQUIRED CONFIG)
-
 target_include_directories(FCT_Node PUBLIC
         ${NODE_INCLUDE_DIR}
         ${V8_INCLUDE_DIR}
@@ -26,7 +24,6 @@ target_include_directories(FCT_Node PUBLIC
 
 target_link_libraries(FCT_Node PUBLIC
         nodejs_deps
-        Boost::boost
 )
 
 if(DEFINED NODE_LIB_DIR)
