@@ -93,19 +93,16 @@ namespace FCT {
     {
         m_embedSem = false;
         m_pollThreadRunning = true;
-        uv_sem_init(&m_uvEmbedSem,0);
         uv_thread_create(&m_pollThreadId, [](void* arg)
         {
             auto* pThis = static_cast<NodeEnvironment*>(arg);
             while (pThis->m_pollThreadRunning)
             {
-                uv_sem_wait(&pThis->m_uvEmbedSem);
-                /*
                 while (!pThis->m_embedSem)
                 {
                     std::this_thread::sleep_for(
                         std::chrono::milliseconds(1));
-                }*/
+                }
                 pThis->m_embedSem = false;
                 pThis->pollEvents();
                 pThis->weakMainThread();
@@ -253,8 +250,7 @@ console.log('FCT Node.js environment initialized');
             int r = uv_run(m_loop,UV_RUN_NOWAIT );
            NodeCommon::GetPlatform()->DrainTasks(m_isolate);
 
-            uv_sem_post(&m_uvEmbedSem);
-            //m_embedSem = true;
+            m_embedSem = true;
         }
     }
 
