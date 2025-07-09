@@ -26,6 +26,6 @@
 #include <thread>
 #include <vector>
 
-#include <boost/lockfree/queue.hpp>
+#include "concurrentqueue.h"
 
 #endif //THIRDPARTY_H

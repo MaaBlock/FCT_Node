@@ -86,7 +86,7 @@ namespace FCT {
             m_embedSem = true;
             delete ticker;
         };
-        m_tickerQueue.push(ticker);
+        m_tickerQueue.enqueue(ticker);
     }
 
     void NodeEnvironment::beginPollThread()
@@ -504,12 +504,12 @@ void NodeEnvironment::stop()
     node::Stop(m_env);
 }
 
+
     void NodeEnvironment::tick()
     {
-        while (!m_tickerQueue.empty())
+        NodeEnvTicker* ticker;
+        while (m_tickerQueue.try_dequeue(ticker))
         {
-            NodeEnvTicker* ticker;
-            m_tickerQueue.pop(ticker);
             ticker->cb();
         }
     }
