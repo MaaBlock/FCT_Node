@@ -44,8 +44,10 @@ add_custom_target(export_all ALL
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/FCT_Node/Bin"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/V8_Headers/Include"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/UV_Headers/Include"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/Node_Headers/Include"
         COMMENT "Creating export directory structure"
 )
+
 
 # 复制FCT_Node头文件
 if(FCT_NODE_HEADERS)
@@ -64,6 +66,15 @@ add_custom_command(TARGET export_all POST_BUILD
         "${CMAKE_BINARY_DIR}/export/FCT_Node/Lib/"
         COMMENT "Copying FCT_Node library to export/FCT_Node/Lib"
 )
+
+if(DEFINED NODE_INCLUDE_DIR AND EXISTS "${NODE_INCLUDE_DIR}")
+    add_custom_command(TARGET export_all POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${NODE_INCLUDE_DIR}"
+            "${CMAKE_BINARY_DIR}/export/Node_Headers/Include"
+            COMMENT "Copying Node headers to export/Node_Headers/Include"
+    )
+endif()
 
 if(DEFINED V8_INCLUDE_DIR AND EXISTS "${V8_INCLUDE_DIR}")
     add_custom_command(TARGET export_all POST_BUILD
