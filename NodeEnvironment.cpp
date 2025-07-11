@@ -135,7 +135,8 @@ namespace FCT {
 
         std::string setupModulePaths = "";
         for (const auto& path : m_modulePaths) {
-            setupModulePaths += "module.paths.push('" + path + "');\n";
+            std::string encodedPath = base64Encode(path);
+            setupModulePaths += "module.paths.push(Buffer.from('" + encodedPath + "', 'base64').toString('utf8'));\n";
         }
 
         std::string initCode = R"(
