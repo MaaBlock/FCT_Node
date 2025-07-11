@@ -136,15 +136,75 @@ namespace FCT {
         std::string setupModulePaths = "";
         for (const auto& path : m_modulePaths) {
             std::string encodedPath = base64Encode(path);
-            setupModulePaths += "module.paths.push(Buffer.from('" + encodedPath + "', 'base64').toString('utf8'));\n";
+            setupModulePaths += "module.paths.unshift(Buffer.from('" + encodedPath + "', 'base64').toString('utf8'));\n";
         }
 
-        std::string initCode = R"(
+        std::string initCode =
+            R"(
+const Module = require('module')
+
+Module._pathCache = Object.create(null)
+
+// 保存原始的 _nodeModulePaths 函数
+const original_nodeModulePaths = Module._nodeModulePaths;
+const original_resolveLookupPaths = Module._resolveLookupPaths;
+
+// 自定义模块路径
+const customModulePaths = [
+)" +
+        // 添加自定义路径
+        [&]() {
+            std::string paths = "";
+            for (size_t i = 0; i < m_modulePaths.size(); ++i) {
+                std::string encodedPath = base64Encode(m_modulePaths[i]);
+                paths += "    Buffer.from('" + encodedPath + "', 'base64').toString('utf8')";
+                if (i < m_modulePaths.size() - 1) {
+                    paths += ",\n";
+                }
+            }
+            return paths;
+        }() +
+        R"(
+];
+
+// 重写 _nodeModulePaths 函数
+Module._nodeModulePaths = function(from) {
+    const originalPaths = original_nodeModulePaths.call(this, from);
+    console.log('_nodeModulePaths called from:', from);
+    console.log('originalPaths:', originalPaths);
+
+    const newPaths = [...originalPaths, ...customModulePaths];
+    console.log('newPaths with custom paths as fallback:', newPaths);
+    return newPaths;
+};
+
+// 更新全局路径
+Module.globalPaths.unshift(...customModulePaths);
+
+console.log('Custom module paths added:', customModulePaths);
+console.log('Updated global paths:', Module.globalPaths);
+
 const publicRequire = require('node:module').createRequire(process.cwd() + '/');
 globalThis.require = publicRequire;
 
-)" + setupModulePaths + R"(
+console.log('require:', require);
+console.log('module:', module);
+console.log('FCT Node.js environment initialized');
+)";
+/*
+        std::string initCode =
+             +
+            R"(
+const Module = require('module')
 
+Module._pathCache = Object.create(null)
+
+)" + setupModulePaths
+        + R"(
+const publicRequire = require('node:module').createRequire(process.cwd() + '/');
+globalThis.require = publicRequire;
+
+console.log('require:', require);
 console.log('module:',module);
 
 globalThis.__FCT_executeScriptBase64 = function(codeBase64) {
@@ -176,7 +236,7 @@ globalThis.__FCT_executeScriptString = function(code) {
 };
 
 console.log('FCT Node.js environment initialized');
-)";
+)";*/
 
         /*v8::MaybeLocal<v8::Value> init_ret = node::LoadEnvironment(m_env, initCode);
 
@@ -207,6 +267,17 @@ console.log('FCT Node.js environment initialized');
             break;
         case CodeFrom::string:
             {
+                 v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, initCode);
+                if (!exec_ret.IsEmpty()) {
+                    v8::Local<v8::Value> localResult = exec_ret.ToLocalChecked();
+                    m_setupRet.Reset(m_isolate, localResult);
+                } else {
+                    std::cerr << "Failed to execute JavaScript code from arguments" << std::endl;
+                    return;
+                }
+                beginPollThread();
+                excuteScript(m_jsCode);
+                /*
                 std::string jsCodeStr(m_jsCode);
                 std::string base64Code = base64Encode(jsCodeStr);
 
@@ -215,6 +286,7 @@ console.log('FCT Node.js environment initialized');
                 v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, initCode + executeCode);
                 v8::Local<v8::Value> localResult = exec_ret.ToLocalChecked();
                 m_setupRet.Reset(m_isolate,localResult);
+                */
                 break;
             }
         }
@@ -255,6 +327,79 @@ console.log('FCT Node.js environment initialized');
 
             m_embedSem = true;
         }
+    }
+
+    void NodeEnvironment::excuteScript(const std::string& jsCode)
+    {
+        if (!m_isolate || !m_env) {
+            std::cerr << "Environment not properly set up. Call setup() first." << std::endl;
+            return;
+        }
+
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        v8::HandleScope handle_scope(m_isolate);
+        v8::Local<v8::Context> context = this->context();
+        v8::Context::Scope context_scope(context);
+
+        v8::TryCatch try_catch(m_isolate);
+
+        v8::Local<v8::String> source = v8::String::NewFromUtf8(
+            m_isolate,
+            jsCode.c_str(),
+            v8::NewStringType::kNormal
+        ).ToLocalChecked();
+
+        std::string script_name = "user_script.js";
+        v8::Local<v8::String> name = v8::String::NewFromUtf8(
+            m_isolate,
+            script_name.c_str(),
+            v8::NewStringType::kNormal
+        ).ToLocalChecked();
+
+        v8::ScriptOrigin origin(name);
+
+        v8::MaybeLocal<v8::Script> maybe_script = v8::Script::Compile(context, source, &origin);
+        if (maybe_script.IsEmpty()) {
+            if (try_catch.HasCaught()) {
+                v8::String::Utf8Value error(m_isolate, try_catch.Exception());
+                std::cerr << "Script compilation failed: " << *error << std::endl;
+
+                v8::Local<v8::Message> message = try_catch.Message();
+                if (!message.IsEmpty()) {
+                    v8::String::Utf8Value filename_utf8(m_isolate, message->GetScriptOrigin().ResourceName());
+                    int linenum = message->GetLineNumber(context).FromMaybe(-1);
+                    std::cerr << "  at " << *filename_utf8 << ":" << linenum << std::endl;
+                }
+            }
+            return;
+        }
+
+        v8::Local<v8::Script> script = maybe_script.ToLocalChecked();
+
+        v8::MaybeLocal<v8::Value> maybe_result = script->Run(context);
+        if (maybe_result.IsEmpty()) {
+            if (try_catch.HasCaught()) {
+                v8::String::Utf8Value error(m_isolate, try_catch.Exception());
+                std::cerr << "Script execution failed: " << *error << std::endl;
+
+                v8::Local<v8::Message> message = try_catch.Message();
+                if (!message.IsEmpty()) {
+                    v8::String::Utf8Value filename_utf8(m_isolate, message->GetScriptOrigin().ResourceName());
+                    int linenum = message->GetLineNumber(context).FromMaybe(-1);
+                    std::cerr << "  at " << *filename_utf8 << ":" << linenum << std::endl;
+
+                    v8::Local<v8::Value> stack_trace = try_catch.StackTrace(context).ToLocalChecked();
+                    if (!stack_trace.IsEmpty()) {
+                        v8::String::Utf8Value stack_utf8(m_isolate, stack_trace);
+                        std::cerr << "Stack trace:\n" << *stack_utf8 << std::endl;
+                    }
+                }
+            }
+            return;
+        }
+
+        m_isolate->PerformMicrotaskCheckpoint();
     }
 
     bool NodeEnvironment::setup()

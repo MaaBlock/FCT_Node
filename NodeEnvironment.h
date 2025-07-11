@@ -66,6 +66,7 @@ namespace FCT {
         void stopEventLoop();
         void runEventLoopOnce();
     public:
+        void excuteScript(const std::string& jsCode);
         bool setup();
         bool executeArg();
         void stop();
