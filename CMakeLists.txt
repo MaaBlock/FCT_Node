@@ -35,9 +35,6 @@ if(DEFINED NODE_LIB_DIR)
     set(NODE_LIB_DIR ${NODE_LIB_DIR} PARENT_SCOPE)
 endif()
 
-
-
-# 创建导出目录结构和复制文件
 add_custom_target(export_all ALL
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/FCT_Node/Include"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/FCT_Node/Lib"
@@ -47,9 +44,6 @@ add_custom_target(export_all ALL
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/Node_Headers/Include"
         COMMENT "Creating export directory structure"
 )
-
-
-# 复制FCT_Node头文件
 if(FCT_NODE_HEADERS)
     add_custom_command(TARGET export_all POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -68,12 +62,32 @@ add_custom_command(TARGET export_all POST_BUILD
 )
 
 if(DEFINED NODE_INCLUDE_DIR AND EXISTS "${NODE_INCLUDE_DIR}")
-    add_custom_command(TARGET export_all POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${NODE_INCLUDE_DIR}"
-            "${CMAKE_BINARY_DIR}/export/Node_Headers/Include"
-            COMMENT "Copying Node headers to export/Node_Headers/Include"
+    file(GLOB_RECURSE NODE_HEADER_FILES
+            "${NODE_INCLUDE_DIR}/*.h"
+            "${NODE_INCLUDE_DIR}/*.hpp"
+            "${NODE_INCLUDE_DIR}/*.hxx"
+            "${NODE_INCLUDE_DIR}/*.inl"
     )
+
+    if(NODE_HEADER_FILES)
+        add_custom_command(TARGET export_all POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/Node_Headers/Include"
+                COMMENT "Creating Node_Headers/Include directory"
+        )
+
+        foreach(HEADER_FILE ${NODE_HEADER_FILES})
+            file(RELATIVE_PATH REL_PATH "${NODE_INCLUDE_DIR}" "${HEADER_FILE}")
+            get_filename_component(REL_DIR "${REL_PATH}" DIRECTORY)
+
+            add_custom_command(TARGET export_all POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/Node_Headers/Include/${REL_DIR}"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${HEADER_FILE}"
+                    "${CMAKE_BINARY_DIR}/export/Node_Headers/Include/${REL_PATH}"
+                    COMMENT "Copying Node header: ${REL_PATH}"
+            )
+        endforeach()
+    endif()
 endif()
 
 if(DEFINED V8_INCLUDE_DIR AND EXISTS "${V8_INCLUDE_DIR}")
@@ -103,9 +117,28 @@ if(DEFINED NODE_LIB_DIR AND EXISTS "${NODE_LIB_DIR}/libnode.dll")
     )
 endif()
 
+if(DEFINED NODE_LIB_DIR AND EXISTS "${NODE_LIB_DIR}/libnode.lib")
+    add_custom_command(TARGET export_all POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${NODE_LIB_DIR}/libnode.lib"
+            "${CMAKE_BINARY_DIR}/export/FCT_Node/Lib/"
+            COMMENT "Copying libnode.lib to export/FCT_Node/Lib"
+    )
+endif()
+
+if(DEFINED NODE_DEPS_LIB_DIR AND EXISTS "${NODE_DEPS_LIB_DIR}")
+    add_custom_command(TARGET export_all POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${NODE_DEPS_LIB_DIR}"
+            "${CMAKE_BINARY_DIR}/export/FCT_Node/Lib/"
+            COMMENT "Copying Node dependencies libraries to export/FCT_Node/Lib"
+    )
+endif()
+
 add_dependencies(export_all FCT_Node)
 
 message(STATUS "Export will be created at: ${CMAKE_BINARY_DIR}/export")
 message(STATUS "V8_INCLUDE_DIR: ${V8_INCLUDE_DIR}")
 message(STATUS "UV_INCLUDE_DIR: ${UV_INCLUDE_DIR}")
 message(STATUS "NODE_LIB_DIR: ${NODE_LIB_DIR}")
+message(STATUS "NODE_DEPS_LIB_DIR: ${NODE_DEPS_LIB_DIR}")

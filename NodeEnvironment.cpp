@@ -144,6 +144,8 @@ globalThis.require = publicRequire;
 
 )" + setupModulePaths + R"(
 
+console.log('module:',module);
+
 globalThis.__FCT_executeScriptBase64 = function(codeBase64) {
     const vm = require('node:vm');
     try {
@@ -299,73 +301,6 @@ console.log('FCT Node.js environment initialized');
         //beginPollThread();
         return true;
     }
-
-    bool NodeEnvironment::execute(std::string_view jsCode)
-{
-    if (!m_isolate || !m_env) {
-        if (!setup()) {
-            return false;
-        }
-    }
-
-    v8::Locker locker(m_isolate);
-    v8::Isolate::Scope isolate_scope(m_isolate);
-    v8::HandleScope handle_scope(m_isolate);
-    v8::Context::Scope context_scope(this->context());
-
-    //if (!m_environmentInitialized) {
-        std::string setupModulePaths = "";
-        for (const auto& path : m_modulePaths) {
-            setupModulePaths += "module.paths.push('" + path + "');\n";
-        }
-
-        std::string initCode = R"(
-const publicRequire = require('node:module').createRequire(process.cwd() + '/');
-globalThis.require = publicRequire;
-
-)" + setupModulePaths + R"(
-
-const vm = require('node:vm');
-globalThis.__FCT_executeScript = function(codeBase64) {
-    try {
-        const code = Buffer.from(codeBase64, 'base64').toString('utf8');
-        return vm.runInThisContext(code);
-    } catch (error) {
-        console.error('Error executing script:', error);
-        return { error: error.message };
-    }
-};
-
-console.log('FCT Node.js environment initialized');
-
-)";
-/*
-        v8::MaybeLocal<v8::Value> init_ret = node::LoadEnvironment(m_env, initCode);
-
-        if (init_ret.IsEmpty()) {
-            std::cerr << "Failed to initialize JavaScript environment" << std::endl;
-            return false;
-        }
-*/
-        m_environmentInitialized = true;
-    //}
-
-    std::string jsCodeStr(jsCode);
-    std::string base64Code = base64Encode(jsCodeStr);
-
-    std::string executeCode = "globalThis.__FCT_executeScript('" + base64Code + "');";
-
-    v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, initCode + executeCode);
-
-    if (exec_ret.IsEmpty()) {
-        std::cerr << "Failed to execute JavaScript code" << std::endl;
-        return false;
-    }
-
-    m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
-
-    return true;
-}
 
 std::string NodeEnvironment::base64Encode(const std::string& input) {
     static const std::string base64_chars =
