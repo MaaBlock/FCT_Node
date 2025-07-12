@@ -60,7 +60,15 @@ int main() {
     )");
     cout << env.callFunction<std::string>("foo") << endl;
     // callFunction<返回值类型>(函数名，函数参数0，函数参数1,....)
-
+    //示例 c++回调
+    env.excuteScript("var cppAdd;");
+    env.global()["cppAdd"] = [](int a, int b) {
+        return a + b;
+    };
+    env.excuteScript(R"(
+        console.log('Testing C++ function from JS:');
+        console.log('cppAdd(5, 3) =', cppAdd(5, 3));
+)");
     // 示例：JSObject操作示例
     env.excuteScript(R"(
     function createUser(name, age) {

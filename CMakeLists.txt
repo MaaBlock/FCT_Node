@@ -21,6 +21,7 @@ add_library(FCT_Node STATIC
         src/JSObject.cpp
         src/JSPromise.cpp
         src/ExplicitMicrotasksScope.cpp
+        src/FunctionWrapper.cpp
 )
 
 target_include_directories(FCT_Node PUBLIC

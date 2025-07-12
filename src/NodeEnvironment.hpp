@@ -32,7 +32,7 @@ namespace FCT
 
         v8::Local<v8::Function> func = v8::Local<v8::Function>::Cast(func_val);
 
-        std::vector<v8::Local<v8::Value>> jsArgs = { convertToJS(m_isolate, args)... };
+        std::vector<v8::Local<v8::Value>> jsArgs = { convertToJS(*this, args)... };
 
         node::async_context asyncContext = { 0, 0 };
         v8::MaybeLocal<v8::Value> result = node::MakeCallback(
@@ -81,7 +81,7 @@ namespace FCT
 
         v8::Local<v8::Function> func = v8::Local<v8::Function>::Cast(func_val);
 
-        std::vector<v8::Local<v8::Value>> jsArgs = { convertToJS(m_isolate, args)... };
+        std::vector<v8::Local<v8::Value>> jsArgs = { convertToJS(*this, args)... };
 
         node::async_context asyncContext = { 0, 0 };
         v8::MaybeLocal<v8::Value> result = node::MakeCallback(

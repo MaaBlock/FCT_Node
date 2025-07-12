@@ -4,8 +4,6 @@
 
 #ifndef JSOBJECT_H
 #define JSOBJECT_H
-#include "NodeEnvironment.h"
-#include "ConvertTo.h"
 namespace FCT {
     class NodeEnvironment;
     class JSObject {
@@ -82,15 +80,6 @@ namespace FCT {
 
         std::vector<std::string> getPropertyNames() const;
     };
-    template<>
-    inline v8::Local<v8::Value> convertToJS<JSObject>(v8::Isolate* isolate, JSObject arg) {
-        return arg.getLocalObject();
-    }
-
-    template<>
-    inline v8::Local<v8::Value> convertToJS<const JSObject&>(v8::Isolate* isolate, const JSObject& arg) {
-        return arg.getLocalObject();
-    }
 } // FCT
 
 #endif //JSOBJECT_H

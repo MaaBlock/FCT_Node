@@ -105,7 +105,6 @@ namespace FCT {
                 pThis->pollEvents();
                 pThis->weakMainThread();
             }
-            printf("end");
         }, this);
         runEventLoopOnce();
     }
@@ -308,6 +307,7 @@ globalThis.require = publicRequire;
     bool NodeEnvironment::setup()
     {
         init();
+        m_functionManager = new FunctionManager();
         auto platform = NodeCommon::GetPlatform().get();
         auto args = m_args;
         auto exec_args = m_excuteArgs;
@@ -410,6 +410,18 @@ globalThis.require = publicRequire;
             pollEvents();
             runEventLoopOnce();
         }
+    }
+
+    JSObject NodeEnvironment::global()
+    {
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        v8::HandleScope handle_scope(m_isolate);
+        auto context = this->context();
+        v8::Context::Scope context_scope(context);
+
+        v8::Local<v8::Object> globalObj = context->Global();
+        return JSObject(this,m_isolate, globalObj);
     }
     void NodeEnvironment::callFunction(const std::string& funcName, const std::vector<v8::Local<v8::Value>>& args)
     {

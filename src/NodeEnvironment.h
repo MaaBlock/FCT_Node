@@ -4,6 +4,8 @@
 
 #ifndef NODEENVIRONMENT_H
 #define NODEENVIRONMENT_H
+#include "FunctionWrapper.h"
+
 #include "JSObject.h"
 namespace FCT {
     class JSPromise;
@@ -56,6 +58,7 @@ namespace FCT {
         uv_thread_t m_pollThreadId;
         node::IsolateData* m_isolateData;
         std::vector<JSPromise*> m_promises;
+        FunctionManager* m_functionManager;
     protected:
         void weakMainThread();
         void beginPollThread();
@@ -67,6 +70,7 @@ namespace FCT {
         void stopEventLoop();
         void runEventLoopOnce();
     public:
+        FunctionManager& functionManager() { return *m_functionManager; }
         void excuteScript(const std::string& jsCode);
         void cleanup();
         bool setup();
@@ -111,6 +115,7 @@ namespace FCT {
         {
             return v8::Local<v8::Context>::New(m_isolate, m_context);
         }
+        JSObject global();
     };
 
 } // FCT

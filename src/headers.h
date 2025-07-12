@@ -12,9 +12,11 @@
 #include "./JSPromise.h"
 #include "./JSArray.h"
 #include "./NodeEnvironment.h"
+#include "./ConvertTo.h"
 #include "./ConvertFrom.h"
 #include "./JSObject.hpp"
 #include "./JSPromise.hpp"
 #include "./JSArray.hpp"
 #include "./NodeEnvironment.hpp"
+#include "./FunctionWrapper.hpp"
 #endif //HEADERS_H
