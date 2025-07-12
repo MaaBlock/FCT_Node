@@ -133,26 +133,12 @@ namespace FCT {
         v8::HandleScope handle_scope(m_isolate);
         v8::Context::Scope context_scope(this->context());
 
-        std::string setupModulePaths = "";
-        for (const auto& path : m_modulePaths) {
-            std::string encodedPath = base64Encode(path);
-            setupModulePaths += "module.paths.unshift(Buffer.from('" + encodedPath + "', 'base64').toString('utf8'));\n";
-        }
-
         std::string initCode =
             R"(
 const Module = require('module')
-
-Module._pathCache = Object.create(null)
-
-// 保存原始的 _nodeModulePaths 函数
 const original_nodeModulePaths = Module._nodeModulePaths;
-const original_resolveLookupPaths = Module._resolveLookupPaths;
-
-// 自定义模块路径
 const customModulePaths = [
 )" +
-        // 添加自定义路径
         [&]() {
             std::string paths = "";
             for (size_t i = 0; i < m_modulePaths.size(); ++i) {
@@ -166,8 +152,6 @@ const customModulePaths = [
         }() +
         R"(
 ];
-
-// 重写 _nodeModulePaths 函数
 Module._nodeModulePaths = function(from) {
     const originalPaths = original_nodeModulePaths.call(this, from);
     console.log('_nodeModulePaths called from:', from);
@@ -178,72 +162,9 @@ Module._nodeModulePaths = function(from) {
     return newPaths;
 };
 
-// 更新全局路径
-Module.globalPaths.unshift(...customModulePaths);
-
-console.log('Custom module paths added:', customModulePaths);
-console.log('Updated global paths:', Module.globalPaths);
-
 const publicRequire = require('node:module').createRequire(process.cwd() + '/');
 globalThis.require = publicRequire;
-
-console.log('require:', require);
-console.log('module:', module);
-console.log('FCT Node.js environment initialized');
 )";
-/*
-        std::string initCode =
-             +
-            R"(
-const Module = require('module')
-
-Module._pathCache = Object.create(null)
-
-)" + setupModulePaths
-        + R"(
-const publicRequire = require('node:module').createRequire(process.cwd() + '/');
-globalThis.require = publicRequire;
-
-console.log('require:', require);
-console.log('module:',module);
-
-globalThis.__FCT_executeScriptBase64 = function(codeBase64) {
-    const vm = require('node:vm');
-    try {
-        const code = Buffer.from(codeBase64, 'base64').toString('utf8');
-        const result = vm.runInThisContext(code, {
-            filename: 'user_script.js',
-            displayErrors: true
-        });
-        return result;
-    } catch (error) {
-        console.error('Error executing script:', error);
-        return { error: error.message };
-    }
-};
-globalThis.__FCT_executeScriptString = function(code) {
-    const vm = require('node:vm');
-    try {
-        const result = vm.runInThisContext(code, {
-            filename: 'user_script.js',
-            displayErrors: true
-        });
-        return result;
-    } catch (error) {
-        console.error('Error executing script:', error);
-        return { error: error.message };
-    }
-};
-
-console.log('FCT Node.js environment initialized');
-)";*/
-
-        /*v8::MaybeLocal<v8::Value> init_ret = node::LoadEnvironment(m_env, initCode);
-
-        if (init_ret.IsEmpty()) {
-            std::cerr << "Failed to initialize JavaScript environment" << std::endl;
-            return;
-        }*/
 
         switch (m_codeFrom)
         {
@@ -570,20 +491,20 @@ void NodeEnvironment::callFunction(const std::string& funcName, const std::vecto
 
     m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
 }
-void NodeEnvironment::callFunction(const std::string& funcName)
-{
-    std::vector<v8::Local<v8::Value>> args;
-    callFunction(funcName, args);
-}
-
-void NodeEnvironment::stop()
-{
-    if (!m_env) {
-        return;
+    void NodeEnvironment::callFunction(const std::string& funcName)
+    {
+        std::vector<v8::Local<v8::Value>> args;
+        callFunction(funcName, args);
     }
 
-    node::Stop(m_env);
-}
+    void NodeEnvironment::stop()
+    {
+        if (!m_env) {
+            return;
+        }
+
+        node::Stop(m_env);
+    }
 
 
     void NodeEnvironment::tick()

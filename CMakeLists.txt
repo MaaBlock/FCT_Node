@@ -8,35 +8,65 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_subdirectory(node)
 
 file(GLOB FCT_NODE_HEADERS
-        "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
+        "src/*.h"
+        "src/*.hpp"
 )
 
+list(REMOVE_ITEM FCT_NODE_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/src/FCT_Node.h")
+
 add_library(FCT_Node STATIC
-        headers.cpp
-        NodeCommon.cpp
-        NodeEnvironment.cpp
-        JSObject.cpp
-        JSPromise.cpp
-        ExplicitMicrotasksScope.cpp
+        src/headers.cpp
+        src/NodeCommon.cpp
+        src/NodeEnvironment.cpp
+        src/JSObject.cpp
+        src/JSPromise.cpp
+        src/ExplicitMicrotasksScope.cpp
 )
 
 target_include_directories(FCT_Node PUBLIC
         ${NODE_INCLUDE_DIR}
         ${V8_INCLUDE_DIR}
         ${UV_INCLUDE_DIR}
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
 target_link_libraries(FCT_Node PUBLIC
         nodejs_deps
 )
+add_custom_target(copy_headers ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/include/FCT_Node"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        COMMENT "Creating include/FCT_Node directory in source"
+)
+
+if(FCT_NODE_HEADERS)
+    add_custom_command(TARGET copy_headers POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${FCT_NODE_HEADERS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/FCT_Node/"
+            COMMENT "Copying FCT_Node headers to source include/FCT_Node"
+            VERBATIM
+    )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/FCT_Node.h")
+    add_custom_command(TARGET copy_headers POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/FCT_Node.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/"
+            COMMENT "Copying FCT_Node.h to include root directory"
+            VERBATIM
+    )
+endif()
+
+add_dependencies(FCT_Node copy_headers)
 
 if(DEFINED NODE_LIB_DIR)
     set(NODE_LIB_DIR ${NODE_LIB_DIR} PARENT_SCOPE)
 endif()
 
 add_custom_target(export_all ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/FCT_Node/Include"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/FCT_Node/Include/FCT_Node"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/FCT_Node/Lib"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/FCT_Node/Bin"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/V8_Headers/Include"
@@ -44,15 +74,27 @@ add_custom_target(export_all ALL
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/Node_Headers/Include"
         COMMENT "Creating export directory structure"
 )
+
 if(FCT_NODE_HEADERS)
     add_custom_command(TARGET export_all POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${FCT_NODE_HEADERS}
-            "${CMAKE_BINARY_DIR}/export/FCT_Node/Include/"
+            "${CMAKE_BINARY_DIR}/export/FCT_Node/Include/FCT_Node/"
             COMMENT "Copying FCT_Node headers to export/FCT_Node/Include"
             VERBATIM
     )
 endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/FCT_Node.h")
+    add_custom_command(TARGET export_all POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/FCT_Node.h"
+            "${CMAKE_BINARY_DIR}/export/FCT_Node/Include/"
+            COMMENT "Copying FCT_Node.h to export root directory"
+            VERBATIM
+    )
+endif()
+
 
 add_custom_command(TARGET export_all POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
