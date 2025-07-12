@@ -15,8 +15,9 @@ env.global()["cppAdd"] = [](int a, int b) {
     return a + b;
 };
 env.excuteScript(R"(
-        console.log('Testing C++ function from JS:');
-        console.log('cppAdd(5, 3) =', cppAdd(5, 3));
+    console.log('Testing C++ function from JS:');
+    console.log('cppAdd(5, 3) =', cppAdd(5, 3));  
+)");
 ```
 ## 二、示例项目
   - [示例项目](https://github.com/MaaBlock/FCT_NodeTutorial)
