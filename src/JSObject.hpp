@@ -37,9 +37,19 @@ namespace FCT
         v8::Local<v8::Object> obj = getLocalObject();
 
         v8::Local<v8::String> key = v8::String::NewFromUtf8(m_isolate, propertyName.c_str()).ToLocalChecked();
-        v8::Local<v8::Value> jsValue = convertToJS(m_isolate, value);
+        v8::Local<v8::Value> jsValue = convertToJS(*m_env, value);
 
         return obj->Set(context, key, jsValue).FromMaybe(false);
+    }
+
+    template<>
+    inline v8::Local<v8::Value> convertToJS<JSObject>(NodeEnvironment& isolate, JSObject arg) {
+        return arg.getLocalObject();
+    }
+
+    template<>
+    inline v8::Local<v8::Value> convertToJS<const JSObject&>(NodeEnvironment& isolate, const JSObject& arg) {
+        return arg.getLocalObject();
     }
 }
 #endif
