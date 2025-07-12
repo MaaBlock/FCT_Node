@@ -1,14 +1,14 @@
-## 介绍
+## 一、介绍
 ### 介绍
 归属于FCT（fleaxable clearly tools）
 提供c++嵌入nodejs的方便封装
 实现nodejs和c++的互操作
 ### 特性
 - ***支持npm包导入*** 仅需指定npm包安装位置即可，如env.addModulePath("./nodejs/node_modules");
-## 示例项目
+## 二、示例项目
   - [示例项目](https://github.com/MaaBlock/FCT_NodeTutorial)
 (有一个调用ai和使用baidu的demo，同时是用来开发的测试项目，可能不稳定)
-## 安装
+## 三、安装
 ### 前置要求
 - CMake 3.20 或更高版本
 - C++20 兼容的编译器（因为Node.js需要C++20支持）
@@ -30,7 +30,7 @@ configure_fct_node_target(your_target)
 - ***必须使用递归克隆***：FCT_Node包含Node.js作为子模块，需要完整的依赖
 - ***C++20要求***：由于Node.js内核需要C++20特性支持，项目必须使用C++20标准
 - ***configure_fct_node_target(target)*** 会自动配置Node.js运行时环境和必要的编译选项
-## 使用
+## 四、使用
 ```c++
 #include <FCT_Node.h>
 using namespace FCT;
