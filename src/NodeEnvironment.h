@@ -6,7 +6,8 @@
 #define NODEENVIRONMENT_H
 #include "JSObject.h"
 namespace FCT {
-/*todo:
+    class JSPromise;
+    /*todo:
  *  1. 完成CodeFrom
  *
  *
@@ -54,6 +55,7 @@ namespace FCT {
         std::unique_ptr<node::ArrayBufferAllocator> m_arrayBufferAllocator;
         uv_thread_t m_pollThreadId;
         node::IsolateData* m_isolateData;
+        std::vector<JSPromise*> m_promises;
     protected:
         void weakMainThread();
         void beginPollThread();
@@ -71,6 +73,15 @@ namespace FCT {
         bool executeArg();
         void stop();
         void tick();
+        void registerPromise(JSPromise* promise) {
+            m_promises.push_back(promise);
+        }
+        void unregisterPromise(JSPromise* promise) {
+            m_promises.erase(
+                std::remove(m_promises.begin(), m_promises.end(), promise),
+                m_promises.end()
+            );
+        }
     public:
         void init();
         void code(std::string jsCode)

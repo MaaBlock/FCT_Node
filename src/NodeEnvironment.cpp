@@ -69,9 +69,7 @@ namespace FCT {
         v8::Local<v8::Context> context = node::NewContext(m_isolate);
 
         m_context.Reset(m_isolate, context);
-
-        std::cout << "V8 Isolate, event loop and context initialized successfully" << std::endl;
-}
+    }
 
     void NodeEnvironment::weakMainThread()
     {
@@ -140,11 +138,8 @@ const customModulePaths = [
 ];
 Module._nodeModulePaths = function(from) {
     const originalPaths = original_nodeModulePaths.call(this, from);
-    console.log('_nodeModulePaths called from:', from);
-    console.log('originalPaths:', originalPaths);
 
     const newPaths = [...originalPaths, ...customModulePaths];
-    console.log('newPaths with custom paths as fallback:', newPaths);
     return newPaths;
 };
 
@@ -265,6 +260,14 @@ globalThis.require = publicRequire;
 
     void NodeEnvironment::cleanup()
     {
+        for (JSPromise* promise : m_promises)
+        {
+            if (promise) {
+                promise->invalidate();
+            }
+        }
+        m_promises.clear();
+
         if (m_pollThreadRunning) {
             m_pollThreadRunning = false;
             if (m_pollThreadId) {
