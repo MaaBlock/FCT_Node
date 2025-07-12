@@ -13,7 +13,7 @@ namespace FCT {
         rejected
     };
 
-    class JSPromise {
+    class JSPromise : public std::enable_shared_from_this<JSPromise> {
     private:
         v8::Isolate* m_isolate;
         NodeEnvironment* m_env;
@@ -53,6 +53,12 @@ namespace FCT {
         std::string getError() const;
 
         bool wait(int timeoutMs = -1);
+        void invalidate() {
+            m_env = nullptr;
+            m_promise.Reset();
+            m_resolver.Reset();
+        }
+
     };
 
 

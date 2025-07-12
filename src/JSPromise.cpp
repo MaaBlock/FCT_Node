@@ -2,7 +2,7 @@
 // Created by Administrator on 2025/6/1.
 //
 
-#include "./JSPromise.h"
+#include "headers.h"
 
 namespace FCT {
     JSPromise::JSPromise(NodeEnvironment* env, v8::Isolate* isolate): m_isolate(isolate), m_env(env), m_isCreator(true)
@@ -21,12 +21,23 @@ namespace FCT {
     JSPromise::JSPromise(NodeEnvironment* env, v8::Isolate* isolate, v8::Local<v8::Promise> promise): m_isolate(isolate), m_env(env), m_isCreator(false)
     {
         m_promise.Reset(m_isolate, promise);
-    }
 
+        if (m_env) {
+            m_env->registerPromise(this);
+        }
+    }
     JSPromise::~JSPromise()
     {
-        m_resolver.Reset();
-        m_promise.Reset();
+        if (m_env)
+        {
+            m_env->unregisterPromise(this);
+        }
+        if (!m_resolver.IsEmpty()) {
+            m_resolver.Reset();
+        }
+        if (!m_promise.IsEmpty()) {
+            m_promise.Reset();
+        }
     }
 
     JSPromise::JSPromise(JSPromise&& other) noexcept: m_isolate(other.m_isolate), m_env(other.m_env), m_isCreator(other.m_isCreator)
