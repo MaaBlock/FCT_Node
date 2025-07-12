@@ -4,7 +4,20 @@
 提供c++嵌入nodejs的方便封装
 实现nodejs和c++的互操作
 ### 特性
-- ***支持npm包导入*** 仅需指定npm包安装位置即可，如env.addModulePath("./nodejs/node_modules");
+- ***支持npm包导入*** 仅需指定npm包安装位置即可，如
+```c++
+env.addModulePath("./nodejs/node_modules");
+```
+- ***c++/nodejs混写*** c++和nodejs可以非常简单的互相调用 例如
+```c++
+env.excuteScript("var cppAdd;");
+env.global()["cppAdd"] = [](int a, int b) {
+    return a + b;
+};
+env.excuteScript(R"(
+        console.log('Testing C++ function from JS:');
+        console.log('cppAdd(5, 3) =', cppAdd(5, 3));
+```
 ## 二、示例项目
   - [示例项目](https://github.com/MaaBlock/FCT_NodeTutorial)
 (有一个调用ai和使用baidu的demo，同时是用来开发的测试项目，可能不稳定)
