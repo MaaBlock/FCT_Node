@@ -98,7 +98,7 @@ namespace FCT {
             auto* pThis = static_cast<NodeEnvironment*>(arg);
             while (pThis->m_pollThreadRunning)
             {
-                while (!pThis->m_embedSem)
+                while (!pThis->m_embedSem && pThis->m_pollThreadRunning)
                 {
                     std::this_thread::sleep_for(
                         std::chrono::milliseconds(1));
@@ -107,22 +107,8 @@ namespace FCT {
                 pThis->pollEvents();
                 pThis->weakMainThread();
             }
+            printf("end");
         }, this);
-        /*
-        m_pollThread = std::thread([this]()
-        {
-           while (m_pollThreadRunning)
-            {
-                while (!m_embedSem)
-                {
-                    std::this_thread::sleep_for(
-                        std::chrono::milliseconds(1));
-                }
-                m_embedSem = false;
-                pollEvents();
-                weakMainThread();
-            }
-        });*/
         runEventLoopOnce();
     }
 
@@ -165,53 +151,7 @@ Module._nodeModulePaths = function(from) {
 const publicRequire = require('node:module').createRequire(process.cwd() + '/');
 globalThis.require = publicRequire;
 )";
-
-        switch (m_codeFrom)
-        {
-        case CodeFrom::file:
-
-            break;
-        case CodeFrom::arg:
-            {
-                std::string executeCode = "globalThis.__FCT_executeScriptString(process.argv[" +
-                                         std::to_string(m_codeArgIndex) + "]);";
-                v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, executeCode);
-                if (!exec_ret.IsEmpty()) {
-                    v8::Local<v8::Value> localResult = exec_ret.ToLocalChecked();
-                    m_setupRet.Reset(m_isolate, localResult);
-                } else {
-                    std::cerr << "Failed to execute JavaScript code from arguments" << std::endl;
-                    return;
-                }
-                m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
-            }
-            break;
-        case CodeFrom::string:
-            {
-                 v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, initCode);
-                if (!exec_ret.IsEmpty()) {
-                    v8::Local<v8::Value> localResult = exec_ret.ToLocalChecked();
-                    m_setupRet.Reset(m_isolate, localResult);
-                } else {
-                    std::cerr << "Failed to execute JavaScript code from arguments" << std::endl;
-                    return;
-                }
-                beginPollThread();
-                excuteScript(m_jsCode);
-                /*
-                std::string jsCodeStr(m_jsCode);
-                std::string base64Code = base64Encode(jsCodeStr);
-
-                std::string executeCode = "globalThis.__FCT_executeScriptBase64('" + base64Code + "');";
-
-                v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, initCode + executeCode);
-                v8::Local<v8::Value> localResult = exec_ret.ToLocalChecked();
-                m_setupRet.Reset(m_isolate,localResult);
-                */
-                break;
-            }
-        }
-
+        v8::MaybeLocal<v8::Value> exec_ret = node::LoadEnvironment(m_env, initCode);
         beginPollThread();
     }
 
@@ -323,8 +263,48 @@ globalThis.require = publicRequire;
         m_isolate->PerformMicrotaskCheckpoint();
     }
 
+    void NodeEnvironment::cleanup()
+    {
+        if (m_pollThreadRunning) {
+            m_pollThreadRunning = false;
+            if (m_pollThreadId) {
+                uv_thread_join(&m_pollThreadId);
+            }
+        }
+
+        if (m_env) {
+            v8::Locker locker(m_isolate);
+            v8::Isolate::Scope isolate_scope(m_isolate);
+            v8::HandleScope handle_scope(m_isolate);
+            node::Stop(m_env);
+            node::FreeEnvironment(m_env);
+            m_env = nullptr;
+        }
+
+        if (m_isolateData) {
+            node::FreeIsolateData(m_isolateData);
+            m_isolateData = nullptr;
+        }
+
+        if (!m_context.IsEmpty()) {
+            m_context.Reset();
+        }
+
+        if (m_isolate) {
+            m_isolate->Dispose();
+            m_isolate = nullptr;
+        }
+
+        if (m_loop) {
+            uv_loop_close(m_loop);
+            delete m_loop;
+            m_loop = nullptr;
+        }
+    }
+
     bool NodeEnvironment::setup()
     {
+        init();
         auto platform = NodeCommon::GetPlatform().get();
         auto args = m_args;
         auto exec_args = m_excuteArgs;
@@ -343,76 +323,62 @@ globalThis.require = publicRequire;
         v8::HandleScope handle_scope(m_isolate);
 
         auto* isolateData = node::CreateIsolateData(m_isolate, m_loop, platform);
-
+        m_isolateData = isolateData;
         v8::Local<v8::Context> context = this->context();
 
         v8::Context::Scope ContextScope(context);
         m_isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kExplicit);
 
         m_env = node::CreateEnvironment(isolateData,context,m_args,m_excuteArgs,node::EnvironmentFlags::kOwnsProcessState);
-        /*
-        std::vector<std::string> errors;
-
-        m_setup = node::CommonEnvironmentSetup::Create(platform, &errors, args, exec_args);
-        if (!m_setup) {
-            for (const std::string& err : errors)
-                fprintf(stderr, "%s: %s\n", args[0].c_str(), err.c_str());
-            return false;
-        }
-
-        m_isolate = m_setup->isolate();
-        m_env = m_setup->env();*/
         excuteSetupJSCode();
-
-
-        //beginPollThread();
         return true;
     }
 
-std::string NodeEnvironment::base64Encode(const std::string& input) {
-    static const std::string base64_chars =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz"
-        "0123456789+/";
+    std::string NodeEnvironment::base64Encode(const std::string& input)
+    {
+        static const std::string base64_chars =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"
+            "0123456789+/";
 
-    std::string ret;
-    int i = 0;
-    int j = 0;
-    unsigned char char_array_3[3];
-    unsigned char char_array_4[4];
+        std::string ret;
+        int i = 0;
+        int j = 0;
+        unsigned char char_array_3[3];
+        unsigned char char_array_4[4];
 
-    for (char c : input) {
-        char_array_3[i++] = c;
-        if (i == 3) {
+        for (char c : input) {
+            char_array_3[i++] = c;
+            if (i == 3) {
+                char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+                char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+                char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+                char_array_4[3] = char_array_3[2] & 0x3f;
+
+                for(i = 0; i < 4; i++)
+                    ret += base64_chars[char_array_4[i]];
+                i = 0;
+            }
+        }
+
+        if (i) {
+            for(j = i; j < 3; j++)
+                char_array_3[j] = '\0';
+
             char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
             char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
             char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
             char_array_4[3] = char_array_3[2] & 0x3f;
 
-            for(i = 0; i < 4; i++)
-                ret += base64_chars[char_array_4[i]];
-            i = 0;
+            for (j = 0; j < i + 1; j++)
+                ret += base64_chars[char_array_4[j]];
+
+            while((i++ < 3))
+                ret += '=';
         }
+
+        return ret;
     }
-
-    if (i) {
-        for(j = i; j < 3; j++)
-            char_array_3[j] = '\0';
-
-        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-        char_array_4[3] = char_array_3[2] & 0x3f;
-
-        for (j = 0; j < i + 1; j++)
-            ret += base64_chars[char_array_4[j]];
-
-        while((i++ < 3))
-            ret += '=';
-    }
-
-    return ret;
-}
     void NodeEnvironment::pollEvents() {
 
 #ifdef _WIN32
@@ -442,55 +408,55 @@ std::string NodeEnvironment::base64Encode(const std::string& input) {
             runEventLoopOnce();
         }
     }
-void NodeEnvironment::callFunction(const std::string& funcName, const std::vector<v8::Local<v8::Value>>& args)
-{
-    if (!m_isolate || !m_env) {
-        std::cerr << "Environment not properly set up. Call setup() first." << std::endl;
-        return;
+    void NodeEnvironment::callFunction(const std::string& funcName, const std::vector<v8::Local<v8::Value>>& args)
+    {
+        if (!m_isolate || !m_env) {
+            std::cerr << "Environment not properly set up. Call setup() first." << std::endl;
+            return;
+        }
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        v8::HandleScope handle_scope(m_isolate);
+        v8::Local<v8::Context> context = this->context();
+        v8::Context::Scope context_scope(context);
+
+        v8::Local<v8::Object> global = context->Global();
+
+        v8::Local<v8::String> func_name = v8::String::NewFromUtf8(m_isolate, funcName.c_str(),
+                                                                 v8::NewStringType::kNormal).ToLocalChecked();
+        v8::MaybeLocal<v8::Value> maybe_func = global->Get(context, func_name);
+
+        if (maybe_func.IsEmpty()) {
+            std::cerr << "Function '" << funcName << "' not found in global scope" << std::endl;
+            return;
+        }
+
+        v8::Local<v8::Value> func_val = maybe_func.ToLocalChecked();
+        if (!func_val->IsFunction()) {
+            std::cerr << "'" << funcName << "' is not a function" << std::endl;
+            return;
+        }
+
+        v8::Local<v8::Function> func = v8::Local<v8::Function>::Cast(func_val);
+
+        std::vector<v8::Local<v8::Value>> argv = args;
+
+        node::async_context asyncContext = { 0, 0 };
+        v8::MaybeLocal<v8::Value> result = node::MakeCallback(
+            m_isolate,
+            global,
+            func,
+            static_cast<int>(argv.size()),
+            argv.empty() ? nullptr : argv.data(),
+            asyncContext);
+
+        if (result.IsEmpty()) {
+            std::cerr << "Error calling function '" << funcName << "'" << std::endl;
+            return;
+        }
+
+        m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
     }
-    v8::Locker locker(m_isolate);
-    v8::Isolate::Scope isolate_scope(m_isolate);
-    v8::HandleScope handle_scope(m_isolate);
-    v8::Local<v8::Context> context = this->context();
-    v8::Context::Scope context_scope(context);
-
-    v8::Local<v8::Object> global = context->Global();
-
-    v8::Local<v8::String> func_name = v8::String::NewFromUtf8(m_isolate, funcName.c_str(),
-                                                             v8::NewStringType::kNormal).ToLocalChecked();
-    v8::MaybeLocal<v8::Value> maybe_func = global->Get(context, func_name);
-
-    if (maybe_func.IsEmpty()) {
-        std::cerr << "Function '" << funcName << "' not found in global scope" << std::endl;
-        return;
-    }
-
-    v8::Local<v8::Value> func_val = maybe_func.ToLocalChecked();
-    if (!func_val->IsFunction()) {
-        std::cerr << "'" << funcName << "' is not a function" << std::endl;
-        return;
-    }
-
-    v8::Local<v8::Function> func = v8::Local<v8::Function>::Cast(func_val);
-
-    std::vector<v8::Local<v8::Value>> argv = args;
-
-    node::async_context asyncContext = { 0, 0 };
-    v8::MaybeLocal<v8::Value> result = node::MakeCallback(
-        m_isolate,
-        global,
-        func,
-        static_cast<int>(argv.size()),
-        argv.empty() ? nullptr : argv.data(),
-        asyncContext);
-
-    if (result.IsEmpty()) {
-        std::cerr << "Error calling function '" << funcName << "'" << std::endl;
-        return;
-    }
-
-    m_exitCode = node::SpinEventLoop(m_env).FromMaybe(1);
-}
     void NodeEnvironment::callFunction(const std::string& funcName)
     {
         std::vector<v8::Local<v8::Value>> args;
@@ -499,11 +465,7 @@ void NodeEnvironment::callFunction(const std::string& funcName, const std::vecto
 
     void NodeEnvironment::stop()
     {
-        if (!m_env) {
-            return;
-        }
-
-        node::Stop(m_env);
+        cleanup();
     }
 
 

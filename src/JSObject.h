@@ -5,32 +5,8 @@
 #ifndef JSOBJECT_H
 #define JSOBJECT_H
 #include "NodeEnvironment.h"
-
+#include "ConvertTo.h"
 namespace FCT {
-    template<typename T>
-    v8::Local<v8::Value> convertToJS(v8::Isolate* isolate,T arg)
-    {
-        return v8::Undefined(isolate);
-    }
-    template<>
-    inline v8::Local<v8::Value> convertToJS<const std::string&>(v8::Isolate* isolate,const std::string& arg)
-    {
-        return v8::String::NewFromUtf8(isolate, arg.c_str()).ToLocalChecked();
-    }
-    template<>
-    inline v8::Local<v8::Value> convertToJS<std::string&&>(v8::Isolate* isolate,std::string&& arg)
-    {
-        return v8::String::NewFromUtf8(isolate, arg.c_str()).ToLocalChecked();
-    }
-    template<>
-    inline v8::Local<v8::Value> convertToJS<std::string>(v8::Isolate* isolate, std::string arg)
-    {
-        return v8::String::NewFromUtf8(isolate, arg.c_str()).ToLocalChecked();
-    }
-    template<>
-    inline v8::Local<v8::Value> convertToJS<const char*>(v8::Isolate* isolate, const char* arg) {
-        return v8::String::NewFromUtf8(isolate, arg).ToLocalChecked();
-    }
     class NodeEnvironment;
     class JSObject {
     private:
@@ -75,17 +51,7 @@ namespace FCT {
         T get(const std::string& propertyName) const;
 
         template<typename T>
-        bool set(const std::string& propertyName, const T& value) {
-            v8::Locker locker(m_isolate);
-            v8::HandleScope handleScope(m_isolate);
-            v8::Local<v8::Context> context = m_isolate->GetCurrentContext();
-            v8::Local<v8::Object> obj = getLocalObject();
-
-            v8::Local<v8::String> key = v8::String::NewFromUtf8(m_isolate, propertyName.c_str()).ToLocalChecked();
-            v8::Local<v8::Value> jsValue = convertToJS(m_isolate, value);
-
-            return obj->Set(context, key, jsValue).FromMaybe(false);
-        }
+        bool set(const std::string& propertyName, const T& value);
 
         class PropertyProxy {
         private:
@@ -112,17 +78,19 @@ namespace FCT {
             return PropertyProxy(*this, propertyName);
         }
 
-        bool hasProperty(const std::string& propertyName) const {
-            v8::HandleScope handleScope(m_isolate);
-            v8::Local<v8::Context> context = m_isolate->GetCurrentContext();
-            v8::Local<v8::Object> obj = getLocalObject();
-
-            v8::Local<v8::String> key = v8::String::NewFromUtf8(m_isolate, propertyName.c_str()).ToLocalChecked();
-            return obj->Has(context, key).FromMaybe(false);
-        }
+        bool hasProperty(const std::string& propertyName) const;
 
         std::vector<std::string> getPropertyNames() const;
     };
+    template<>
+    inline v8::Local<v8::Value> convertToJS<JSObject>(v8::Isolate* isolate, JSObject arg) {
+        return arg.getLocalObject();
+    }
+
+    template<>
+    inline v8::Local<v8::Value> convertToJS<const JSObject&>(v8::Isolate* isolate, const JSObject& arg) {
+        return arg.getLocalObject();
+    }
 } // FCT
 
 #endif //JSOBJECT_H

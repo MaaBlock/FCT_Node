@@ -184,3 +184,25 @@ message(STATUS "V8_INCLUDE_DIR: ${V8_INCLUDE_DIR}")
 message(STATUS "UV_INCLUDE_DIR: ${UV_INCLUDE_DIR}")
 message(STATUS "NODE_LIB_DIR: ${NODE_LIB_DIR}")
 message(STATUS "NODE_DEPS_LIB_DIR: ${NODE_DEPS_LIB_DIR}")
+
+function(configure_fct_node_target target_name)
+    if(NOT TARGET ${target_name})
+        message(FATAL_ERROR "Target ${target_name} does not exist")
+    endif()
+
+    target_link_libraries(${target_name} PUBLIC FCT_Node)
+
+    if(DEFINED NODE_LIB_DIR)
+        add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${NODE_LIB_DIR}/libnode.dll"
+                $<TARGET_FILE_DIR:${target_name}>
+                COMMENT "Copying libnode.dll for ${target_name}"
+        )
+    endif()
+
+    message(STATUS "Configured FCT_Node for target: ${target_name}")
+endfunction()
+
+add_subdirectory(tests)
+
