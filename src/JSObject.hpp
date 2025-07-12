@@ -25,5 +25,21 @@ namespace FCT
         v8::Local<v8::Value> value = maybeValue.ToLocalChecked();
         return convertFromJS<T>(*m_env, value);
     }
+
+    template <typename T>
+    bool JSObject::set(const std::string& propertyName, const T& value)
+    {
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        v8::HandleScope handleScope(m_isolate);
+        v8::Local<v8::Context> context = m_env->context();
+        v8::Context::Scope context_scope(context);
+        v8::Local<v8::Object> obj = getLocalObject();
+
+        v8::Local<v8::String> key = v8::String::NewFromUtf8(m_isolate, propertyName.c_str()).ToLocalChecked();
+        v8::Local<v8::Value> jsValue = convertToJS(m_isolate, value);
+
+        return obj->Set(context, key, jsValue).FromMaybe(false);
+    }
 }
 #endif

@@ -26,7 +26,6 @@ namespace FCT {
     class NodeEnvironment
     {
     protected:
-        //std::unique_ptr<node::CommonEnvironmentSetup> m_setup;
         v8::Isolate* m_isolate = nullptr;
         node::Environment* m_env = nullptr;
         std::thread m_eventLoopThread;
@@ -54,7 +53,7 @@ namespace FCT {
         v8::Global<v8::Context> m_context;
         std::unique_ptr<node::ArrayBufferAllocator> m_arrayBufferAllocator;
         uv_thread_t m_pollThreadId;
-
+        node::IsolateData* m_isolateData;
     protected:
         void weakMainThread();
         void beginPollThread();
@@ -67,16 +66,13 @@ namespace FCT {
         void runEventLoopOnce();
     public:
         void excuteScript(const std::string& jsCode);
+        void cleanup();
         bool setup();
         bool executeArg();
         void stop();
         void tick();
     public:
         void init();
-        NodeEnvironment()
-        {
-            init();
-        }
         void code(std::string jsCode)
         {
             m_codeFrom = CodeFrom::string;
