@@ -58,6 +58,8 @@ namespace FCT
     std::enable_if_t<!is_lambda_v<std::decay_t<T>>, v8::Local<v8::Value>>
     convertToJS(NodeEnvironment& env, T arg)
     {
+        std::cerr << "Warning: convertToJS called with unsupported type: "
+              << typeid(T).name() << ". Returning v8::Undefined." << std::endl;
         return v8::Undefined(env.isolate());
     }
     template<>
