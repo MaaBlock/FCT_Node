@@ -7,7 +7,31 @@
 namespace FCT
 {
     template<typename T>
-    T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
+T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
+        std::cerr << "Warning: No convertFromJS specialization for type '"
+                  << typeid(T).name() << "'. Returning default-constructed value." << std::endl;
+
+        v8::Isolate* isolate = env.isolate();
+        if (jsValue->IsUndefined()) {
+            std::cerr << "  JavaScript value type: undefined" << std::endl;
+        } else if (jsValue->IsNull()) {
+            std::cerr << "  JavaScript value type: null" << std::endl;
+        } else if (jsValue->IsBoolean()) {
+            std::cerr << "  JavaScript value type: boolean" << std::endl;
+        } else if (jsValue->IsNumber()) {
+            std::cerr << "  JavaScript value type: number" << std::endl;
+        } else if (jsValue->IsString()) {
+            std::cerr << "  JavaScript value type: string" << std::endl;
+        } else if (jsValue->IsArray()) {
+            std::cerr << "  JavaScript value type: array" << std::endl;
+        } else if (jsValue->IsObject()) {
+            std::cerr << "  JavaScript value type: object" << std::endl;
+        } else if (jsValue->IsFunction()) {
+            std::cerr << "  JavaScript value type: function" << std::endl;
+        } else {
+            std::cerr << "  JavaScript value type: unknown" << std::endl;
+        }
+
         return T();
     }
 
