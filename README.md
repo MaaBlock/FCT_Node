@@ -37,7 +37,7 @@ cd FCT_Node
 将FCT_Node目录复制到您的项目根目录下，然后在您的CMakeLists.txt中添加：
 ```cmake
 add_subdirectory(FCT_Node)
-configure_fct_node_target(your_target)
+target_link_fct_node_libraries(your_target)
 ```
 ### 3. 构建项目
 ### 重要说明
