@@ -1,6 +1,6 @@
 
 # FCT_Node - Seamless C++/Node.js Integration
-FCT_Node is a powerful C++ library that provides seamless integration between C++ and Node.js, enabling bidirectional interoperability with minimal overhead. Part of the Flexible Clearly Tools (FCT) suite.
+FCT_Node is a powerful C++ library that provides seamless integration between C++ and Node.js, enabling bidirectional interoperability. Part of the Flexible Clearly Tools (FCT) suite.
 
 ## Language
 - [English](./README.md)

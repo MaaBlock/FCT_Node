@@ -22,5 +22,5 @@ target_link_fct_node_libraries(your_target)
 ### Important Notes
 - **Recursive clone is mandatory** - Contains Node.js as submodule
 - **C++20 is required** - Node.js core requires modern C++ features
-- Automatic configuration via `configure_fct_node_target()`
+- Automatic configuration via `target_link_fct_node_libraries()`
 ```
