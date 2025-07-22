@@ -1,6 +1,10 @@
-//
-// Created by Administrator on 2025/5/22.
-//
+/**
+* @file headers.h
+ * @brief Internal header aggregation file that includes all FCT_Node components
+ * @details This file aggregates all necessary headers for FCT_Node functionality.
+ *          Users should not include this file directly, but rather include FCT_Node.h instead.
+ * @author FCT Team
+ */
 
 #ifndef FCT_NODE_HEADERS_H
 #define FCT_NODE_HEADERS_H

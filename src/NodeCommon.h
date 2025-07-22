@@ -1,6 +1,10 @@
-//
-// Created by Administrator on 2025/5/22.
-//
+/**
+* @file NodeCommon.h
+ * @brief Node.js common utilities and initialization management
+ * @details This file provides the core Node.js initialization and termination functionality.
+ *          Users should not include this file directly, but rather include FCT_Node.h instead.
+ * @author FCT Team
+ */
 
 #ifndef NODECOMMON_H
 #define NODECOMMON_H
@@ -22,19 +26,38 @@ namespace FCT {
             T::Term();
         }
     };
+    /**
+  * @brief Node.js common operations and global state management
+  * @details Provides static methods for initializing and terminating the Node.js environment.
+  *          Must be called before using any Node.js functionality.
+  */
     class NodeCommon
     {
     private:
         static std::shared_ptr<node::InitializationResult> g_initializationResultl;
         static std::unique_ptr<node::MultiIsolatePlatform> g_platform;
     public:
+        /**
+         * @brief Get the Node.js initialization result
+         * @return Shared pointer to the initialization result
+         */
         static std::shared_ptr<node::InitializationResult> GetInitializationResult() {
             return g_initializationResultl;
         }
+        /**
+       * @brief Get the Node.js platform instance
+       * @return Reference to the platform unique pointer
+       */
         static const std::unique_ptr<node::MultiIsolatePlatform>& GetPlatform()
         {
             return g_platform;
         }
+        /**
+        * @brief Initialize Node.js environment
+        * @details Must be called once before using any Node.js functionality.
+        *          Initializes V8 platform and Node.js process.
+        * @throws std::runtime_error if initialization fails
+        */
         static void Init()
         {
             auto args = std::vector<std::string>();
@@ -60,12 +83,21 @@ namespace FCT {
             v8::V8::Initialize();
             g_platform = std::move(platform);
         }
+        /**
+        * @brief Terminate Node.js environment
+        * @details Must be called once at program exit to clean up resources.
+        *          Disposes V8 platform and tears down Node.js process.
+        */
         static void Term()
         {
             v8::V8::Dispose();
             v8::V8::DisposePlatform();
             node::TearDownOncePerProcess();
         }
+        /**
+         * @brief Instance initialization method (currently unused)
+         * @deprecated Use static Init() method instead
+         */
         void init()
         {
 

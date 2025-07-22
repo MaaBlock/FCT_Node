@@ -1,11 +1,38 @@
-//
-// Created by Administrator on 2025/5/29.
-//
-
+ /**
+* @brief Convert JavaScript function to C++ std::function
+    * @tparam ReturnType Return type of the function
+    * @tparam Args Argument types of the function
+    * @param isolate V8 isolate instance
+    * @param value JavaScript function value
+    * @return C++ std::function wrapper, nullptr if not a function
+    * @details Creates a callable C++ function that invokes the JavaScript function.
+    *          Users can add their own template specializations for custom types by
+    *          providing template<> specializations of convertFromJS<YourType>.
+    * @example
+    * @code
+    * auto jsFunc = convertFromJS<int, int, int>(isolate, jsFunctionValue);
+    * int result = jsFunc(5, 3); // Calls JavaScript function with arguments
+    *
+    * // Custom type specialization example:
+    * template<>
+    * inline MyCustomType convertFromJS<MyCustomType>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
+    *     // Your custom conversion logic here
+    *     return MyCustomType();
+    * }
+    * @endcode
+    */
 #ifndef CONVERTFROM_H
 #define CONVERTFROM_H
 namespace FCT
 {
+    /**
+   * @brief Generic template for converting JavaScript values to C++ types
+   * @tparam T Target C++ type
+   * @param env Node environment reference
+   * @param jsValue JavaScript value to convert
+   * @return Converted C++ value or default-constructed value if conversion fails
+   * @details This is the fallback template that provides error reporting for unsupported types
+   */
     template<typename T>
 T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         std::cerr << "Warning: No convertFromJS specialization for type '"
@@ -34,7 +61,12 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
 
         return T();
     }
-
+    /**
+        * @brief Convert JavaScript boolean to C++ bool
+        * @param env Node environment reference
+        * @param jsValue JavaScript boolean value
+        * @return C++ bool value, false if not a boolean
+        */
     template<>
     inline bool convertFromJS<bool>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
@@ -43,7 +75,12 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         }
         return false;
     }
-
+    /**
+       * @brief Convert JavaScript string to C++ std::string
+       * @param env Node environment reference
+       * @param jsValue JavaScript string value
+       * @return C++ std::string, empty string if not a string
+       */
     template<>
     inline std::string convertFromJS<std::string>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
@@ -55,7 +92,12 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         }
         return "";
     }
-
+    /**
+        * @brief Convert JavaScript string to C++ std::u8string
+        * @param env Node environment reference
+        * @param jsValue JavaScript string value
+        * @return C++ std::u8string, empty string if not a string
+        */
     template<>
     inline std::u8string convertFromJS<std::u8string>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
@@ -67,7 +109,12 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         }
         return std::u8string();
     }
-
+    /**
+       * @brief Convert JavaScript object to JSObject wrapper
+       * @param env Node environment reference
+       * @param jsValue JavaScript object value
+       * @return JSObject wrapper, empty object if not an object
+       */
     template<>
     inline JSObject convertFromJS<JSObject>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
@@ -77,6 +124,13 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         }
         return JSObject(&env, isolate, v8::Object::New(isolate));
     }
+    /**
+     * @brief Convert JavaScript Promise to JSPromise wrapper
+     * @param env Node environment reference
+     * @param jsValue JavaScript Promise value
+     * @return JSPromise wrapper
+     * @throws NodeError if value is not a Promise
+     */
     template<>
     inline JSPromise convertFromJS<JSPromise>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
@@ -87,6 +141,13 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         }
         throw NodeError("Expected a Promise");
     }
+    /**
+     * @brief Convert JavaScript Array to JSArray wrapper
+     * @param env Node environment reference
+     * @param jsValue JavaScript Array value
+     * @return JSArray wrapper
+     * @throws NodeError if value is not an Array
+     */
     template<>
     inline JSArray convertFromJS<JSArray>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
@@ -96,6 +157,12 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         }
         throw NodeError("Expected a Array");
     }
+    /**
+   * @brief Convert JavaScript number to C++ int
+   * @param env Node environment reference
+   * @param jsValue JavaScript number value
+   * @return C++ int value, 0 if not a number
+   */
     template<>
     inline int convertFromJS<int>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
@@ -104,7 +171,20 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         }
         return 0;
     }
-
+    /**
+        * @brief Convert JavaScript function to C++ std::function
+        * @tparam ReturnType Return type of the function
+        * @tparam Args Argument types of the function
+        * @param isolate V8 isolate instance
+        * @param value JavaScript function value
+        * @return C++ std::function wrapper, nullptr if not a function
+        * @details Creates a callable C++ function that invokes the JavaScript function
+        * @example
+        * @code
+        * auto jsFunc = convertFromJS<int, int, int>(isolate, jsFunctionValue);
+        * int result = jsFunc(5, 3); // Calls JavaScript function with arguments
+        * @endcode
+        */
     template<typename ReturnType, typename... Args>
    inline std::function<ReturnType(Args...)> convertFromJS(v8::Isolate* isolate,
                                                           v8::Local<v8::Value> value) {
