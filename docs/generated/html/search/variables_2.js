@@ -1,0 +1,6 @@
+var searchData=
+[
+  ['explicit_5fblock_5fempty_5fcounter_5fthreshold_0',['EXPLICIT_BLOCK_EMPTY_COUNTER_THRESHOLD',['../structmoodycamel_1_1_concurrent_queue_default_traits.html#ad894d1299ccbfb7a3461c01ef94e4dfe',1,'moodycamel::ConcurrentQueueDefaultTraits::EXPLICIT_BLOCK_EMPTY_COUNTER_THRESHOLD'],['../classmoodycamel_1_1_concurrent_queue.html#aaadd55fc6ac80c277225977fe9bdecee',1,'moodycamel::ConcurrentQueue::EXPLICIT_BLOCK_EMPTY_COUNTER_THRESHOLD']]],
+  ['explicit_5fconsumer_5fconsumption_5fquota_5fbefore_5frotate_1',['EXPLICIT_CONSUMER_CONSUMPTION_QUOTA_BEFORE_ROTATE',['../structmoodycamel_1_1_concurrent_queue_default_traits.html#a41bdd69209c251641d440fa420a31ad0',1,'moodycamel::ConcurrentQueueDefaultTraits::EXPLICIT_CONSUMER_CONSUMPTION_QUOTA_BEFORE_ROTATE'],['../classmoodycamel_1_1_concurrent_queue.html#a8593fb32003144c034323c8fe353c359',1,'moodycamel::ConcurrentQueue::EXPLICIT_CONSUMER_CONSUMPTION_QUOTA_BEFORE_ROTATE']]],
+  ['explicit_5finitial_5findex_5fsize_2',['EXPLICIT_INITIAL_INDEX_SIZE',['../structmoodycamel_1_1_concurrent_queue_default_traits.html#a4931905d2afbf0d2cdd3bcbb68396d62',1,'moodycamel::ConcurrentQueueDefaultTraits::EXPLICIT_INITIAL_INDEX_SIZE'],['../classmoodycamel_1_1_concurrent_queue.html#ae29231222f904afacd0c9ed55d67cd09',1,'moodycamel::ConcurrentQueue::EXPLICIT_INITIAL_INDEX_SIZE']]]
+];
