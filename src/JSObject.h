@@ -1,4 +1,3 @@
-JSObject.h
 /**
  * @file JSObject.h
  * @brief JavaScript Object wrapper for C++ interoperability

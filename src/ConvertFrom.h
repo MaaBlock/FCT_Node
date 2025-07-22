@@ -8,7 +8,6 @@
     * @details Creates a callable C++ function that invokes the JavaScript function.
     *          Users can add their own template specializations for custom types by
     *          providing template<> specializations of convertFromJS<YourType>.
-    * @example
     * @code
     * auto jsFunc = convertFromJS<int, int, int>(isolate, jsFunctionValue);
     * int result = jsFunc(5, 3); // Calls JavaScript function with arguments
