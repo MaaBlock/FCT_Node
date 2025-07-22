@@ -1,6 +1,13 @@
-//
-// Created by Administrator on 2025/7/12.
-//
+/**
+ * @file ConvertTo.h
+ * @brief C++ to JavaScript type conversion utilities
+ * @details This file provides template functions and specializations for converting
+ *          C++ types to JavaScript values. It handles various data types including
+ *          primitives, strings, functions, and lambdas with automatic type detection.
+ *          Users can extend this system by adding their own template specializations.
+ *          Users should not include this file directly, but rather include FCT_Node.h instead.
+ * @author FCT Team
+ */
 
 #ifndef CONVERTTO_H
 #define CONVERTTO_H
