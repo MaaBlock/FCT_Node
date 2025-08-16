@@ -29,7 +29,8 @@ int main()
 
     env.addModulePath("./CusstomModulePath/node_modules");
     wcout.imbue(locale(".UTF-8"));
-    env.code(R"(
+    env.setup();
+    env.excuteScript(R"(
 const Module = require('module');
 Module.registerHooks({
   resolve: (specifier, context, nextResolve) => {
@@ -39,8 +40,6 @@ Module.registerHooks({
 });
 const uuid = require('uuid')
 )");
-    env.setup();
-    printf("finish");
     env.stop();
     NodeCommon::Term();
     return 0;
