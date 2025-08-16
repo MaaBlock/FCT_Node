@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(FCT_Node)
+include("config/copy_headers.cmake")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -34,33 +35,8 @@ target_include_directories(FCT_Node PUBLIC
 target_link_libraries(FCT_Node PUBLIC
         nodejs_deps
 )
-add_custom_target(copy_headers ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/include/FCT_Node"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/include"
-        COMMENT "Creating include/FCT_Node directory in source"
-)
 
-if(FCT_NODE_HEADERS)
-    add_custom_command(TARGET copy_headers POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${FCT_NODE_HEADERS}
-            "${CMAKE_CURRENT_SOURCE_DIR}/include/FCT_Node/"
-            COMMENT "Copying FCT_Node headers to source include/FCT_Node"
-            VERBATIM
-    )
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/FCT_Node.h")
-    add_custom_command(TARGET copy_headers POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/FCT_Node.h"
-            "${CMAKE_CURRENT_SOURCE_DIR}/include/"
-            COMMENT "Copying FCT_Node.h to include root directory"
-            VERBATIM
-    )
-endif()
-
-add_dependencies(FCT_Node copy_headers)
+add_copy_target_headers(FCT_Node "${FCT_NODE_HEADERS}")
 
 if(DEFINED NODE_LIB_DIR)
     set(NODE_LIB_DIR ${NODE_LIB_DIR} PARENT_SCOPE)
