@@ -1,4 +1,4 @@
-/**
+﻿/**
 * @file NodeEnvironment.h
  * @brief Node.js environment management and JavaScript execution interface
  * @details This file provides the main NodeEnvironment class for managing Node.js runtime,
