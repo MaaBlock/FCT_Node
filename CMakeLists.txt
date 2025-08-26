@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(FCT_Node)
 include("config/copy_headers.cmake")
+include("config/set_utf8_compiler_encoding.cmake")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -35,6 +36,7 @@ target_include_directories(FCT_Node PUBLIC
 target_link_libraries(FCT_Node PUBLIC
         nodejs_deps
 )
+set_utf8_for_target(FCT_Node)
 
 add_copy_target_headers(FCT_Node "${FCT_NODE_HEADERS}")
 
