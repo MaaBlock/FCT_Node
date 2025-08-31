@@ -82,4 +82,55 @@ namespace FCT {
 
         return result;
     }
+
+    std::vector<std::string> JSObject::getFunctionNames() const
+    {
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        v8::HandleScope handleScope(m_isolate);
+        v8::Local<v8::Context> context = m_env->context();
+        if (context.IsEmpty()) {
+            std::cout << "empty context" << std::endl;
+            return {};
+        }
+
+        v8::Context::Scope context_scope(context);
+        v8::Local<v8::Object> obj = getLocalObject();
+        if (obj.IsEmpty())
+        {
+            std::cout << "empty obj" << std::endl;
+            return {};
+        }
+
+        v8::MaybeLocal<v8::Array> maybeProps = obj->GetOwnPropertyNames(context);
+        if (maybeProps.IsEmpty()) {
+            return {};
+        }
+
+        v8::Local<v8::Array> props = maybeProps.ToLocalChecked();
+        std::vector<std::string> result;
+        uint32_t length = props->Length();
+
+        for (uint32_t i = 0; i < length; i++) {
+            v8::MaybeLocal<v8::Value> maybeProp = props->Get(context, i);
+            if (maybeProp.IsEmpty()) continue;
+
+            v8::Local<v8::Value> prop = maybeProp.ToLocalChecked();
+            v8::String::Utf8Value utf8Value(m_isolate, prop);
+            if (*utf8Value) {
+                std::string propName(*utf8Value);
+
+                v8::Local<v8::String> key = v8::String::NewFromUtf8(m_isolate, propName.c_str()).ToLocalChecked();
+                v8::MaybeLocal<v8::Value> maybeValue = obj->Get(context, key);
+                if (!maybeValue.IsEmpty()) {
+                    v8::Local<v8::Value> value = maybeValue.ToLocalChecked();
+                    if (value->IsFunction()) {
+                        result.push_back(propName);
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
 } // FCT
