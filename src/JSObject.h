@@ -122,6 +122,12 @@ namespace FCT {
           * @details Returns enumerable own properties of the object
           */
         std::vector<std::string> getPropertyNames() const;
+        /**
+          * @brief Get all function property names of the object
+          * @return Vector of function property names as strings
+          * @details Returns only properties that are functions
+          */
+        std::vector<std::string> getFunctionNames() const;
     };
 } // FCT
 
