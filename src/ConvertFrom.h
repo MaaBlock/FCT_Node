@@ -1,4 +1,4 @@
- /**
+/**
 * @brief Convert JavaScript function to C++ std::function
     * @tparam ReturnType Return type of the function
     * @tparam Args Argument types of the function
@@ -169,6 +169,62 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
             return jsValue->Int32Value(env.context()).FromMaybe(0);
         }
         return 0;
+    }
+    /**
+   * @brief Convert JavaScript number to C++ unsigned int
+   * @param env Node environment reference
+   * @param jsValue JavaScript number value
+   * @return C++ unsigned int value, 0 if not a number
+   */
+    template<>
+    inline unsigned int convertFromJS<unsigned int>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
+        v8::Isolate* isolate = env.isolate();
+        if (jsValue->IsNumber()) {
+            return jsValue->Uint32Value(env.context()).FromMaybe(0);
+        }
+        return 0;
+    }
+    /**
+   * @brief Convert JavaScript number to C++ unsigned __int64
+   * @param env Node environment reference
+   * @param jsValue JavaScript number value
+   * @return C++ unsigned __int64 value, 0 if not a number
+   */
+    template<>
+    inline unsigned __int64 convertFromJS<unsigned __int64>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
+        v8::Isolate* isolate = env.isolate();
+        if (jsValue->IsNumber()) {
+            return static_cast<unsigned __int64>(jsValue->IntegerValue(env.context()).FromMaybe(0));
+        }
+        return 0;
+    }
+    /**
+   * @brief Convert JavaScript number to C++ float
+   * @param env Node environment reference
+   * @param jsValue JavaScript number value
+   * @return C++ float value, 0.0f if not a number
+   */
+    template<>
+    inline float convertFromJS<float>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
+        v8::Isolate* isolate = env.isolate();
+        if (jsValue->IsNumber()) {
+            return static_cast<float>(jsValue->NumberValue(env.context()).FromMaybe(0.0));
+        }
+        return 0.0f;
+    }
+    /**
+   * @brief Convert JavaScript number to C++ double
+   * @param env Node environment reference
+   * @param jsValue JavaScript number value
+   * @return C++ double value, 0.0 if not a number
+   */
+    template<>
+    inline double convertFromJS<double>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
+        v8::Isolate* isolate = env.isolate();
+        if (jsValue->IsNumber()) {
+            return jsValue->NumberValue(env.context()).FromMaybe(0.0);
+        }
+        return 0.0;
     }
     /**
         * @brief Convert JavaScript function to C++ std::function

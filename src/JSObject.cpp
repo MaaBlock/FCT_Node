@@ -20,7 +20,7 @@ namespace FCT {
         m_env = env;
     }
 
-    JSObject::JSObject(JSObject&& other) noexcept: m_isolate(other.m_isolate)
+    JSObject::JSObject(JSObject&& other) noexcept: m_isolate(other.m_isolate), m_env(other.m_env)
     {
         if (!other.m_object.IsEmpty()) {
             v8::HandleScope handleScope(other.m_isolate);
@@ -28,6 +28,7 @@ namespace FCT {
             m_object.Reset(other.m_isolate, localObj);
             other.m_object.Reset();
         }
+        other.m_env = nullptr;
     }
 
     bool JSObject::hasProperty(const std::string& propertyName) const
