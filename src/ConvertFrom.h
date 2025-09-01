@@ -113,7 +113,7 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
        * @param env Node environment reference
        * @param jsValue JavaScript object value
        * @return JSObject wrapper, empty object if not an object
-       */
+    */
     template<>
     inline JSObject convertFromJS<JSObject>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
@@ -122,6 +122,17 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
             return JSObject(&env, isolate, jsObject);
         }
         return JSObject(&env, isolate, v8::Object::New(isolate));
+    }
+    /**
+        * @brief Convert JavaScript value to C++ JSAny
+        * @param env Node environment reference
+        * @param jsValue JavaScript value of any type
+        * @return C++ JSAny wrapping the JavaScript value
+        */
+    template<>
+    inline JSAny convertFromJS<JSAny>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
+        v8::Isolate* isolate = env.isolate();
+        return JSAny(&env, isolate, jsValue);
     }
     /**
      * @brief Convert JavaScript Promise to JSPromise wrapper

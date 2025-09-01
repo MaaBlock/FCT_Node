@@ -21,6 +21,7 @@ add_library(FCT_Node STATIC
         src/NodeCommon.cpp
         src/NodeEnvironment.cpp
         src/JSObject.cpp
+        src/JSAny.cpp
         src/JSPromise.cpp
         src/ExplicitMicrotasksScope.cpp
         src/FunctionWrapper.cpp
