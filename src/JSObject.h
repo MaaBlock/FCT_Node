@@ -39,8 +39,10 @@ namespace FCT {
             if (this != &other) {
                 m_object.Reset();
                 m_isolate = other.m_isolate;
+                m_env = other.m_env;
                 m_object.Reset(other.m_isolate, other.getLocalObject());
                 other.m_object.Reset();
+                other.m_env = nullptr;
                 std::cout << "right moved" << std::endl;
             }
             std::cout << "return this"<< std::endl;

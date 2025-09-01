@@ -66,9 +66,24 @@ namespace FCT
     convertToJS(NodeEnvironment& env, T arg)
     {
         std::cerr << "Warning: convertToJS called with unsupported type: "
-              << typeid(T).name() << ". Returning v8::Undefined." << std::endl;
+              << typeid(T).name() << ". Size: " << sizeof(T) << ". Returning v8::Undefined." << std::endl;
         return v8::Undefined(env.isolate());
     }
+    // 特化：直接返回v8::Local<v8::Value>
+    template<>
+    inline v8::Local<v8::Value> convertToJS<v8::Local<v8::Value>>(NodeEnvironment& env, v8::Local<v8::Value> arg)
+    {
+        return arg;
+    }
+    
+    template<>
+    inline v8::Local<v8::Value> convertToJS<const v8::Local<v8::Value>&>(NodeEnvironment& env, const v8::Local<v8::Value>& arg)
+    {
+        return arg;
+    }
+
+
+    
     template<>
     inline v8::Local<v8::Value> convertToJS<const std::string&>(NodeEnvironment& env, const std::string& arg)
     {
@@ -147,6 +162,26 @@ namespace FCT
     template<>
     inline v8::Local<v8::Value> convertToJS<const bool&>(NodeEnvironment& env, const bool& arg) {
         return v8::Boolean::New(env.isolate(), arg);
+    }
+
+    template<>
+    inline v8::Local<v8::Value> convertToJS<std::vector<std::string>>(NodeEnvironment& env, std::vector<std::string> arg) {
+        v8::Local<v8::Array> array = v8::Array::New(env.isolate(), static_cast<int>(arg.size()));
+        for (size_t i = 0; i < arg.size(); ++i) {
+            v8::Local<v8::String> str = v8::String::NewFromUtf8(env.isolate(), arg[i].c_str()).ToLocalChecked();
+            array->Set(env.context(), static_cast<uint32_t>(i), str).Check();
+        }
+        return array;
+    }
+
+    template<>
+    inline v8::Local<v8::Value> convertToJS<const std::vector<std::string>&>(NodeEnvironment& env, const std::vector<std::string>& arg) {
+        v8::Local<v8::Array> array = v8::Array::New(env.isolate(), static_cast<int>(arg.size()));
+        for (size_t i = 0; i < arg.size(); ++i) {
+            v8::Local<v8::String> str = v8::String::NewFromUtf8(env.isolate(), arg[i].c_str()).ToLocalChecked();
+            array->Set(env.context(), static_cast<uint32_t>(i), str).Check();
+        }
+        return array;
     }
 
     template<typename ReturnType, typename... Args>
