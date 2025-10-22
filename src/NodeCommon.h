@@ -8,6 +8,9 @@
 
 #ifndef NODECOMMON_H
 #define NODECOMMON_H
+#include <filesystem>
+
+
 #include "./NodeEnvironment.h"
 
 namespace FCT {
@@ -58,6 +61,7 @@ namespace FCT {
         *          Initializes V8 platform and Node.js process.
         * @throws std::runtime_error if initialization fails
         */
+
         static void Init()
         {
             auto args = std::vector<std::string>();
@@ -82,7 +86,19 @@ namespace FCT {
             v8::V8::InitializePlatform(platform.get());
             v8::V8::Initialize();
             g_platform = std::move(platform);
+
+            printf("");
         }
+        /*
+        static void Init()
+        {
+            auto args = std::vector<std::string>();
+            args.push_back("FctNodeApp");
+
+            node::InitializeOncePerProcess(args);
+
+            g_platform = node::MultiIsolatePlatform::Create(GetOptimalNodeThreadPoolSize());
+        }*/
         /**
         * @brief Terminate Node.js environment
         * @details Must be called once at program exit to clean up resources.

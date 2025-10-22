@@ -3,6 +3,10 @@
 //
 
 #include "./headers.h"
+#ifdef _WIN32
+#else
+#include <poll.h>
+#endif
 
 namespace FCT {
     int GetOptimalNodeThreadPoolSize(){
@@ -57,18 +61,7 @@ namespace FCT {
             m_loop = nullptr;
             return;
         }
-
-
         m_isolate->SetData(0, this);
-
-
-        v8::Locker locker(m_isolate);
-        v8::Isolate::Scope isolate_scope(m_isolate);
-        v8::HandleScope handle_scope(m_isolate);
-
-        v8::Local<v8::Context> context = node::NewContext(m_isolate);
-
-        m_context.Reset(m_isolate, context);
     }
 
     void NodeEnvironment::weakMainThread()
@@ -309,7 +302,12 @@ globalThis.require = publicRequire;
         init();
         m_functionManager = new FunctionManager();
         auto platform = NodeCommon::GetPlatform().get();
-        auto args = m_args;
+        std::vector<std::string> args;
+        //args.push_back(std::string("FctNodeApp"));
+        for (auto arg : m_args)
+        {
+            args.push_back(arg);
+        }
         auto exec_args = m_excuteArgs;
 
         for (auto &arg : args)
@@ -322,17 +320,48 @@ globalThis.require = publicRequire;
         }
 
         v8::Locker locker(m_isolate);
-        v8::Isolate::Scope isolate_scope(m_isolate);
-        v8::HandleScope handle_scope(m_isolate);
+        v8::Isolate::Scope isolateScope(m_isolate);
+        v8::HandleScope handleScope(m_isolate);
 
-        auto* isolateData = node::CreateIsolateData(m_isolate, m_loop, platform);
+        auto* isolateData = node::CreateIsolateData(m_isolate, m_loop, platform, m_arrayBufferAllocator.get());
         m_isolateData = isolateData;
-        v8::Local<v8::Context> context = this->context();
+
+
+        v8::Local<v8::Context> context = node::NewContext(m_isolate);
+
+        m_context.Reset(m_isolate, context);
+
+        //v8::Local<v8::Context> context = this->context();
 
         v8::Context::Scope ContextScope(context);
         m_isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kExplicit);
+        v8::TryCatch try_catch(m_isolate);
 
-        m_env = node::CreateEnvironment(isolateData,context,m_args,m_excuteArgs,node::EnvironmentFlags::kOwnsProcessState);
+
+        m_env = node::CreateEnvironment(isolateData, context, args, exec_args, node::EnvironmentFlags::kOwnsProcessState);
+
+        // 检查是否有 JS 异常被捕获
+        if (try_catch.HasCaught())
+        {
+            std::cerr << "!!! A JavaScript exception was caught during Node.js Environment creation:" << std::endl;
+
+            v8::String::Utf8Value exception(m_isolate, try_catch.Exception());
+            std::cerr << "Exception: " << *exception << std::endl;
+
+            v8::Local<v8::Message> message = try_catch.Message();
+            if (!message.IsEmpty()) {
+                v8::String::Utf8Value utf8(m_isolate, message->Get());
+                std::cerr << "Error Message: " << *utf8 << std::endl;
+            }
+
+            v8::Local<v8::Value> stack_trace;
+            if (try_catch.StackTrace(context).ToLocal(&stack_trace) && stack_trace->IsString()) {
+                v8::String::Utf8Value utf8(m_isolate, stack_trace.As<v8::String>());
+                std::cerr << "Stack Trace:\n" << *utf8 << std::endl;
+            }
+
+            return false; // 创建失败
+        }
         excuteSetupJSCode();
         return true;
     }
@@ -393,10 +422,32 @@ globalThis.require = publicRequire;
 
         GetQueuedCompletionStatus(m_loop->iocp, &bytes, &key, &overlapped, timeout);
 
+        // If we got an event, post it back to the queue for processing by the
+        // event loop.
         if (overlapped != nullptr)
             PostQueuedCompletionStatus(m_loop->iocp, bytes, key, overlapped);
 #else
 
+        int timeout = uv_backend_timeout(m_loop);
+        int backend_fd = uv_backend_fd(m_loop);
+
+        struct pollfd pfd;
+        pfd.fd = backend_fd;
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+
+        // Wait for events on the libuv file descriptor.
+        int ret = poll(&pfd, 1, timeout);
+
+        // If poll() returns a value greater than 0, it means there are events
+        // to be processed. A return value of 0 indicates a timeout, and a
+        // negative value indicates an error.
+        if (ret != 0) {
+            // Run the libuv event loop in UV_RUN_NOWAIT mode. This will process
+            // all pending events and callbacks without blocking for new I/O,
+            // as we've already waited with poll().
+            uv_run(m_loop, UV_RUN_NOWAIT);
+        }
 #endif
     }
     void NodeEnvironment::blockRunLoop()

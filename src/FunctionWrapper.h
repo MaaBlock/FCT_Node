@@ -6,6 +6,7 @@
 #include <memory>
 #include <unordered_map>
 #include <mutex>
+#include <node_api.h>
 
 namespace FCT
 {

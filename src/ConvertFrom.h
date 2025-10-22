@@ -202,10 +202,10 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
    * @return C++ unsigned __int64 value, 0 if not a number
    */
     template<>
-    inline unsigned __int64 convertFromJS<unsigned __int64>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
+   inline uint64_t convertFromJS<uint64_t>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
         if (jsValue->IsNumber()) {
-            return static_cast<unsigned __int64>(jsValue->IntegerValue(env.context()).FromMaybe(0));
+            return static_cast<uint64_t>(jsValue->IntegerValue(env.context()).FromMaybe(0));
         }
         return 0;
     }
