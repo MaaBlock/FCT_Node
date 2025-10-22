@@ -173,12 +173,22 @@ function(configure_fct_node_target target_name)
     target_link_libraries(${target_name} PUBLIC FCT_Node)
 
     if(DEFINED NODE_LIB_DIR)
-        add_custom_command(TARGET ${target_name} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${NODE_LIB_DIR}/libnode.dll"
-                $<TARGET_FILE_DIR:${target_name}>
-                COMMENT "Copying libnode.dll for ${target_name}"
-        )
+        if(WIN32)
+            set(NODE_SHARED_LIB_NAME "libnode.dll")
+        elseif(APPLE)
+
+        else()
+            set(NODE_SHARED_LIB_NAME "libnode.so")
+        endif()
+
+        if(EXISTS "${NODE_LIB_DIR}/${NODE_SHARED_LIB_NAME}")
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${NODE_LIB_DIR}/${NODE_SHARED_LIB_NAME}"
+                    $<TARGET_FILE_DIR:${target_name}>
+                    COMMENT "Copying ${NODE_SHARED_LIB_NAME} for ${target_name}"
+            )
+        endif()
     endif()
 
     message(STATUS "Configured FCT_Node for target: ${target_name}")
@@ -192,12 +202,22 @@ function(target_link_fct_node_libraries target_name)
     target_link_libraries(${target_name} FCT_Node)
 
     if(DEFINED NODE_LIB_DIR)
-        add_custom_command(TARGET ${target_name} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${NODE_LIB_DIR}/libnode.dll"
-                $<TARGET_FILE_DIR:${target_name}>
-                COMMENT "Copying libnode.dll for ${target_name}"
-        )
+        if(WIN32)
+            set(NODE_SHARED_LIB_NAME "libnode.dll")
+        elseif(APPLE)
+
+        else()
+            set(NODE_SHARED_LIB_NAME "libnode.so")
+        endif()
+
+        if(EXISTS "${NODE_LIB_DIR}/${NODE_SHARED_LIB_NAME}")
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${NODE_LIB_DIR}/${NODE_SHARED_LIB_NAME}"
+                    $<TARGET_FILE_DIR:${target_name}>
+                    COMMENT "Copying ${NODE_SHARED_LIB_NAME} for ${target_name}"
+            )
+        endif()
     endif()
 
     message(STATUS "Configured FCT_Node for target: ${target_name}")
