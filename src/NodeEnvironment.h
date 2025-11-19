@@ -214,6 +214,8 @@ namespace FCT {
          * @endcode
          */
         JSObject global();
+
+        JSObject createJSObject();
     };
 
 } // FCT
