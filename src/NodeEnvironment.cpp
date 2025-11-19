@@ -474,6 +474,19 @@ globalThis.require = publicRequire;
         v8::Local<v8::Object> globalObj = context->Global();
         return JSObject(this,m_isolate, globalObj);
     }
+
+    JSObject NodeEnvironment::createJSObject()
+    {
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        v8::HandleScope handle_scope(m_isolate);
+        auto context = this->context();
+        v8::Context::Scope context_scope(context);
+
+        v8::Local<v8::Object> newV8Object = v8::Object::New(m_isolate);
+        return JSObject(this, m_isolate, newV8Object);
+    }
+
     void NodeEnvironment::callFunction(const std::string& funcName, const std::vector<v8::Local<v8::Value>>& args)
     {
         if (!m_isolate || !m_env) {
