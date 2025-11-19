@@ -84,14 +84,11 @@ namespace FCT
     {
         return v8::String::NewFromUtf8(env.isolate(), arg.c_str()).ToLocalChecked();
     }
-    
-    // Rvalue ref specialization (T=string&& is valid? No, const T& binds to rvalue)
-    // But string&& specialization is distinct.
-    // If primary template is const T&, then convertToJS(..., string&&) matches T=string? No.
-    // It matches T=string, arg is const string&.
-    // So we don't strictly need string&& specialization if logic is same (copy).
-    // But keeping it for explicit rvalue handling if needed, though primary handles it via const ref.
-    // I'll keep const std::string& specialization but written as <std::string> since T=std::string.
+
+    template<size_t N>
+    inline v8::Local<v8::Value> convertToJS(NodeEnvironment& env, const char (&arg)[N]) {
+        return v8::String::NewFromUtf8(env.isolate(), arg).ToLocalChecked();
+    }
 
     template<>
     inline v8::Local<v8::Value> convertToJS<const char*>(NodeEnvironment& env, const char* const& arg) {
