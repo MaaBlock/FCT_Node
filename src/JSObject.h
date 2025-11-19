@@ -130,6 +130,16 @@ namespace FCT {
           * @details Returns only properties that are functions
           */
         std::vector<std::string> getFunctionNames() const;
+        /**
+          * @brief Call a member function of the object
+          * @tparam ReturnType Type of return value (default void)
+          * @tparam Args Types of function arguments
+          * @param funcName Name of the function to call
+          * @param args Function arguments
+          * @return Function return value converted to ReturnType
+          */
+        template<typename ReturnType = void, typename... Args>
+        ReturnType call(const std::string& funcName, Args... args);
     };
 } // FCT
 

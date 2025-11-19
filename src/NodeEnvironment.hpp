@@ -3,7 +3,7 @@
 namespace FCT
 {
     template<typename ReturnType, typename... Args>
-    ReturnType NodeEnvironment::callFunction(const std::string& funcName, Args... args)
+    ReturnType NodeEnvironment::callFunction(const std::string& funcName, Args&&... args)
     {
         if (!m_isolate || !m_env) {
             throw NodeError("callFunction " + funcName + " failed: call setup before use");;
@@ -52,7 +52,7 @@ namespace FCT
         return convertFromJS<ReturnType>(*this,result.ToLocalChecked());
     }
     template<typename... Args>
-    JSObject NodeEnvironment::callFunction(const std::string& funcName, Args... args)
+    JSObject NodeEnvironment::callFunction(const std::string& funcName, Args&&... args)
     {
         if (!m_isolate || !m_env) {
             throw NodeError("callFunction " + funcName + " failed: call setup before use");;
