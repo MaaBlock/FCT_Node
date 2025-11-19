@@ -43,13 +43,43 @@ namespace FCT
     }
 
     template<>
-    inline v8::Local<v8::Value> convertToJS<JSObject>(NodeEnvironment& isolate, JSObject arg) {
+    inline v8::Local<v8::Value> convertToJS<JSObject>(NodeEnvironment& isolate, const JSObject& arg) {
         return arg.getLocalObject();
     }
 
-    template<>
-    inline v8::Local<v8::Value> convertToJS<const JSObject&>(NodeEnvironment& isolate, const JSObject& arg) {
-        return arg.getLocalObject();
+    template<typename ReturnType, typename... Args>
+    ReturnType JSObject::call(const std::string& funcName, Args... args) {
+        v8::Isolate* isolate = m_isolate;
+        v8::Locker locker(isolate);
+        v8::Isolate::Scope isolate_scope(isolate);
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = m_env->context();
+        v8::Context::Scope context_scope(context);
+
+        v8::Local<v8::Object> obj = getLocalObject();
+        v8::Local<v8::String> name = v8::String::NewFromUtf8(isolate, funcName.c_str()).ToLocalChecked();
+        v8::Local<v8::Value> funcVal;
+
+        bool hasFunc = obj->Get(context, name).ToLocal(&funcVal) && funcVal->IsFunction();
+
+        if (!hasFunc) {
+            if constexpr (std::is_void_v<ReturnType>) return;
+            else return ReturnType();
+        }
+
+        v8::Local<v8::Function> func = funcVal.As<v8::Function>();
+        std::vector<v8::Local<v8::Value>> argv = { convertToJS(*m_env, args)... };
+
+        v8::MaybeLocal<v8::Value> maybeResult = func->Call(context, obj, argv.size(), argv.data());
+
+        if constexpr (std::is_void_v<ReturnType>) {
+            return;
+        } else {
+            if (!maybeResult.IsEmpty()) {
+                return convertFromJS<ReturnType>(*m_env, maybeResult.ToLocalChecked());
+            }
+            return ReturnType();
+        }
     }
 }
 #endif

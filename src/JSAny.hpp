@@ -35,12 +35,7 @@ namespace FCT {
     
     // convertToJS specializations for JSAny
     template<>
-    inline v8::Local<v8::Value> convertToJS<JSAny>(NodeEnvironment& env, JSAny arg) {
-        return arg.value();
-    }
-    
-    template<>
-    inline v8::Local<v8::Value> convertToJS<const JSAny&>(NodeEnvironment& env, const JSAny& arg) {
+    inline v8::Local<v8::Value> convertToJS<JSAny>(NodeEnvironment& env, const JSAny& arg) {
         return arg.value();
     }
     

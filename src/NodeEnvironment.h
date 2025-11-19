@@ -180,7 +180,7 @@ namespace FCT {
        * @endcode
        */
         template<typename ReturnType, typename... Args>
-        ReturnType callFunction(const std::string& funcName, Args... args);
+        ReturnType callFunction(const std::string& funcName, Args&&... args);
         /**
         * @brief Call JavaScript function returning JSObject
         * @tparam Args Types of function arguments
@@ -189,7 +189,7 @@ namespace FCT {
         * @return JSObject wrapping the return value
         */
         template<typename... Args>
-        JSObject callFunction(const std::string& funcName, Args... args);
+        JSObject callFunction(const std::string& funcName, Args&&... args);
         /**
          * @brief Get V8 isolate instance
          * @return Pointer to V8 isolate
@@ -213,11 +213,11 @@ namespace FCT {
          * };
          * @endcode
          */
+
         JSObject global();
 
         JSObject createJSObject();
     };
-
 } // FCT
 //todo:封装一个 jobeject，然后支持  obj[property] 来访问字段
 #endif //NODEENVIRONMENT_H

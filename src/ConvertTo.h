@@ -63,119 +63,90 @@ namespace FCT
     }
     template<typename T>
     std::enable_if_t<!is_lambda_v<std::decay_t<T>>, v8::Local<v8::Value>>
-    convertToJS(NodeEnvironment& env, T arg)
+    convertToJS(NodeEnvironment& env, const T& arg)
     {
         std::cerr << "Warning: convertToJS called with unsupported type: "
               << typeid(T).name() << ". Size: " << sizeof(T) << ". Returning v8::Undefined." << std::endl;
         return v8::Undefined(env.isolate());
     }
+    
     // 特化：直接返回v8::Local<v8::Value>
+    // 保留 const ref
     template<>
-    inline v8::Local<v8::Value> convertToJS<v8::Local<v8::Value>>(NodeEnvironment& env, v8::Local<v8::Value> arg)
-    {
-        return arg;
-    }
-    
-    template<>
-    inline v8::Local<v8::Value> convertToJS<const v8::Local<v8::Value>&>(NodeEnvironment& env, const v8::Local<v8::Value>& arg)
+    inline v8::Local<v8::Value> convertToJS<v8::Local<v8::Value>>(NodeEnvironment& env, const v8::Local<v8::Value>& arg)
     {
         return arg;
     }
 
-
+    // String specializations
+    template<>
+    inline v8::Local<v8::Value> convertToJS<std::string>(NodeEnvironment& env, const std::string& arg)
+    {
+        return v8::String::NewFromUtf8(env.isolate(), arg.c_str()).ToLocalChecked();
+    }
     
+    // Rvalue ref specialization (T=string&& is valid? No, const T& binds to rvalue)
+    // But string&& specialization is distinct.
+    // If primary template is const T&, then convertToJS(..., string&&) matches T=string? No.
+    // It matches T=string, arg is const string&.
+    // So we don't strictly need string&& specialization if logic is same (copy).
+    // But keeping it for explicit rvalue handling if needed, though primary handles it via const ref.
+    // I'll keep const std::string& specialization but written as <std::string> since T=std::string.
+
     template<>
-    inline v8::Local<v8::Value> convertToJS<const std::string&>(NodeEnvironment& env, const std::string& arg)
-    {
-        return v8::String::NewFromUtf8(env.isolate(), arg.c_str()).ToLocalChecked();
-    }
-    template<>
-    inline v8::Local<v8::Value> convertToJS<std::string&&>(NodeEnvironment& env, std::string&& arg)
-    {
-        return v8::String::NewFromUtf8(env.isolate(), arg.c_str()).ToLocalChecked();
-    }
-    template<>
-    inline v8::Local<v8::Value> convertToJS<std::string>(NodeEnvironment& env, std::string arg)
-    {
-        return v8::String::NewFromUtf8(env.isolate(), arg.c_str()).ToLocalChecked();
-    }
-    template<>
-    inline v8::Local<v8::Value> convertToJS<const char*>(NodeEnvironment& env, const char* arg) {
+    inline v8::Local<v8::Value> convertToJS<const char*>(NodeEnvironment& env, const char* const& arg) {
         return v8::String::NewFromUtf8(env.isolate(), arg).ToLocalChecked();
     }
 
+    // Numeric types - removed by-value specializations, kept/adapted reference ones
+    
     template<>
-  inline v8::Local<v8::Value> convertToJS<int>(NodeEnvironment& env, int arg) {
+    inline v8::Local<v8::Value> convertToJS<int>(NodeEnvironment& env, const int& arg) {
         return v8::Integer::New(env.isolate(), arg);
     }
 
     template<>
-    inline v8::Local<v8::Value> convertToJS<const int&>(NodeEnvironment& env, const int& arg) {
-        return v8::Integer::New(env.isolate(), arg);
-    }
-
-    template<>
-    inline v8::Local<v8::Value> convertToJS<unsigned int>(NodeEnvironment& env, unsigned int arg) {
+    inline v8::Local<v8::Value> convertToJS<unsigned int>(NodeEnvironment& env, const unsigned int& arg) {
         return v8::Integer::NewFromUnsigned(env.isolate(), arg);
     }
 
     template<>
-    inline v8::Local<v8::Value> convertToJS<long>(NodeEnvironment& env, long arg) {
+    inline v8::Local<v8::Value> convertToJS<long>(NodeEnvironment& env, const long& arg) {
         return v8::Number::New(env.isolate(), static_cast<double>(arg));
     }
 
     template<>
-    inline v8::Local<v8::Value> convertToJS<long long>(NodeEnvironment& env, long long arg) {
+    inline v8::Local<v8::Value> convertToJS<long long>(NodeEnvironment& env, const long long& arg) {
         return v8::Number::New(env.isolate(), static_cast<double>(arg));
     }
 
     template<>
-    inline v8::Local<v8::Value> convertToJS<unsigned long>(NodeEnvironment& env, unsigned long arg) {
+    inline v8::Local<v8::Value> convertToJS<unsigned long>(NodeEnvironment& env, const unsigned long& arg) {
         return v8::Number::New(env.isolate(), static_cast<double>(arg));
     }
 
     template<>
-    inline v8::Local<v8::Value> convertToJS<unsigned long long>(NodeEnvironment& env, unsigned long long arg) {
+    inline v8::Local<v8::Value> convertToJS<unsigned long long>(NodeEnvironment& env, const unsigned long long& arg) {
         return v8::Number::New(env.isolate(), static_cast<double>(arg));
     }
 
     template<>
-    inline v8::Local<v8::Value> convertToJS<float>(NodeEnvironment& env, float arg) {
+    inline v8::Local<v8::Value> convertToJS<float>(NodeEnvironment& env, const float& arg) {
         return v8::Number::New(env.isolate(), static_cast<double>(arg));
     }
 
     template<>
-    inline v8::Local<v8::Value> convertToJS<double>(NodeEnvironment& env, double arg) {
+    inline v8::Local<v8::Value> convertToJS<double>(NodeEnvironment& env, const double& arg) {
         return v8::Number::New(env.isolate(), arg);
     }
 
     template<>
-    inline v8::Local<v8::Value> convertToJS<const double&>(NodeEnvironment& env, const double& arg) {
-        return v8::Number::New(env.isolate(), arg);
-    }
-
-    template<>
-    inline v8::Local<v8::Value> convertToJS<bool>(NodeEnvironment& env, bool arg) {
+    inline v8::Local<v8::Value> convertToJS<bool>(NodeEnvironment& env, const bool& arg) {
         return v8::Boolean::New(env.isolate(), arg);
     }
 
     template<>
-    inline v8::Local<v8::Value> convertToJS<const bool&>(NodeEnvironment& env, const bool& arg) {
-        return v8::Boolean::New(env.isolate(), arg);
-    }
-
-    template<>
-    inline v8::Local<v8::Value> convertToJS<std::vector<std::string>>(NodeEnvironment& env, std::vector<std::string> arg) {
-        v8::Local<v8::Array> array = v8::Array::New(env.isolate(), static_cast<int>(arg.size()));
-        for (size_t i = 0; i < arg.size(); ++i) {
-            v8::Local<v8::String> str = v8::String::NewFromUtf8(env.isolate(), arg[i].c_str()).ToLocalChecked();
-            array->Set(env.context(), static_cast<uint32_t>(i), str).Check();
-        }
-        return array;
-    }
-
-    template<>
-    inline v8::Local<v8::Value> convertToJS<const std::vector<std::string>&>(NodeEnvironment& env, const std::vector<std::string>& arg) {
+    inline v8::Local<v8::Value> convertToJS<std::vector<std::string>>(NodeEnvironment& env, const std::vector<std::string>& arg) {
         v8::Local<v8::Array> array = v8::Array::New(env.isolate(), static_cast<int>(arg.size()));
         for (size_t i = 0; i < arg.size(); ++i) {
             v8::Local<v8::String> str = v8::String::NewFromUtf8(env.isolate(), arg[i].c_str()).ToLocalChecked();
