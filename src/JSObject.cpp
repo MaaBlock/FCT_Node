@@ -23,6 +23,7 @@ namespace FCT {
     JSObject::JSObject(JSObject&& other) noexcept: m_isolate(other.m_isolate), m_env(other.m_env)
     {
         if (!other.m_object.IsEmpty()) {
+            v8::Locker locker(other.m_isolate);
             v8::HandleScope handleScope(other.m_isolate);
             v8::Local<v8::Object> localObj = other.m_object.Get(other.m_isolate);
             m_object.Reset(other.m_isolate, localObj);
