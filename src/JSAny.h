@@ -69,6 +69,8 @@ namespace FCT {
           */
         bool isUndefined() const {
             if (m_value.IsEmpty()) return true;
+            v8::Locker locker(m_isolate);
+            v8::HandleScope scope(m_isolate);
             return getValue()->IsUndefined();
         }
         
@@ -78,6 +80,8 @@ namespace FCT {
           */
         bool isBoolean() const {
             if (m_value.IsEmpty()) return false;
+            v8::Locker locker(m_isolate);
+            v8::HandleScope scope(m_isolate);
             return getValue()->IsBoolean();
         }
         
@@ -87,6 +91,8 @@ namespace FCT {
           */
         bool isNumber() const {
             if (m_value.IsEmpty()) return false;
+            v8::Locker locker(m_isolate);
+            v8::HandleScope scope(m_isolate);
             return getValue()->IsNumber();
         }
         
@@ -96,6 +102,8 @@ namespace FCT {
           */
         bool isString() const {
             if (m_value.IsEmpty()) return false;
+            v8::Locker locker(m_isolate);
+            v8::HandleScope scope(m_isolate);
             return getValue()->IsString();
         }
         
@@ -105,6 +113,8 @@ namespace FCT {
           */
         bool isObject() const {
             if (m_value.IsEmpty()) return false;
+            v8::Locker locker(m_isolate);
+            v8::HandleScope scope(m_isolate);
             return getValue()->IsObject();
         }
         
@@ -114,6 +124,8 @@ namespace FCT {
           */
         bool isArray() const {
             if (m_value.IsEmpty()) return false;
+            v8::Locker locker(m_isolate);
+            v8::HandleScope scope(m_isolate);
             return getValue()->IsArray();
         }
         
@@ -123,6 +135,8 @@ namespace FCT {
           */
         bool isFunction() const {
             if (m_value.IsEmpty()) return false;
+            v8::Locker locker(m_isolate);
+            v8::HandleScope scope(m_isolate);
             return getValue()->IsFunction();
         }
         

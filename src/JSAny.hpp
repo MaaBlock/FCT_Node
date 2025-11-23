@@ -21,6 +21,8 @@ namespace FCT {
         if (m_value.IsEmpty()) {
             return T{}; // 返回默认值
         }
+        v8::Locker locker(m_isolate);
+        v8::HandleScope scope(m_isolate);
         return convertFromJS<T>(*m_env, getValue());
     }
     
@@ -30,6 +32,8 @@ namespace FCT {
             // 对于没有默认构造函数的类型，直接抛出异常
             throw std::runtime_error("Cannot convert empty JSAny to target type");
         }
+        v8::Locker locker(m_isolate);
+        v8::HandleScope scope(m_isolate);
         return convertFromJS<T>(*m_env, getValue());
     }
     
