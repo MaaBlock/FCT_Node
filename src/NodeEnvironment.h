@@ -217,6 +217,8 @@ namespace FCT {
         JSObject global();
 
         JSObject createJSObject();
+
+        uv_loop_t* loop() const { return m_loop; }
     };
 } // FCT
 //todo:封装一个 jobeject，然后支持  obj[property] 来访问字段
