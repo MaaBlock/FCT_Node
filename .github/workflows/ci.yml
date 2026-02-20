@@ -34,6 +34,8 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ubuntu:20.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
     - name: Install System Dependencies
       run: |
@@ -71,7 +73,7 @@ jobs:
 
     - name: Build and Test in ARM64 Docker
       run: |
-        docker run --rm --platform linux/arm64 -v ${{ github.workspace }}:/workspace -w /workspace ubuntu:20.04 bash -c "
+        docker run --rm --platform linux/arm64 -e DEBIAN_FRONTEND=noninteractive -v ${{ github.workspace }}:/workspace -w /workspace ubuntu:20.04 bash -c "
           apt-get update && \
           apt-get install -y git cmake ninja-build g++-10 python3 make curl zip unzip tar pkg-config perl && \
           update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100 --slave /usr/bin/g++ g++ /usr/bin/g++-10 && \
