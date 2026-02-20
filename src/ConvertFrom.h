@@ -177,7 +177,7 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
     inline int convertFromJS<int>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
         if (jsValue->IsNumber()) {
-            return jsValue->Int32Value(env.context()).FromMaybe(0);
+            return static_cast<int>(jsValue->NumberValue(env.context()).FromMaybe(0.0));
         }
         return 0;
     }
@@ -191,7 +191,7 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
     inline unsigned int convertFromJS<unsigned int>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
         if (jsValue->IsNumber()) {
-            return jsValue->Uint32Value(env.context()).FromMaybe(0);
+            return static_cast<unsigned int>(jsValue->NumberValue(env.context()).FromMaybe(0.0));
         }
         return 0;
     }
@@ -205,7 +205,7 @@ T convertFromJS(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
    inline uint64_t convertFromJS<uint64_t>(NodeEnvironment& env, v8::Local<v8::Value> jsValue) {
         v8::Isolate* isolate = env.isolate();
         if (jsValue->IsNumber()) {
-            return static_cast<uint64_t>(jsValue->IntegerValue(env.context()).FromMaybe(0));
+            return static_cast<uint64_t>(jsValue->NumberValue(env.context()).FromMaybe(0.0));
         }
         return 0;
     }

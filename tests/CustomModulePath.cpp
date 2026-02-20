@@ -12,7 +12,7 @@ int main()
     auto current_path = std::filesystem::current_path();
     cout << "Current working directory: " << current_path << endl;
 
-    // 检查相对路径是否存在
+    // 检查相对路径是否存在 (Check relative path)
     std::filesystem::path relative_path = "./CusstomModulePath/node_modules";
     cout << "Checking relative path: " << relative_path << endl;
     cout << "Relative path exists: " << std::filesystem::exists(relative_path) << endl;

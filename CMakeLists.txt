@@ -1,19 +1,173 @@
 cmake_minimum_required(VERSION 3.10)
-project(FCT_Node)
+
+if(NOT DEFINED ENV{VCPKG_ROOT})
+    message(FATAL_ERROR "Error: VCPKG_ROOT environment variable is not defined. Please set it to your vcpkg installation root.")
+endif()
+
+file(TO_CMAKE_PATH "$ENV{VCPKG_ROOT}" VCPKG_ROOT_PATH)
+set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT_PATH}/scripts/buildsystems/vcpkg.cmake")
+
+project(NexusScript)
+
 include("config/copy_headers.cmake")
 include("config/set_utf8_compiler_encoding.cmake")
+
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    set(CMAKE_C_SHOWINCLUDES_PREFIX "Note: including file: ")
+    set(CMAKE_CXX_SHOWINCLUDES_PREFIX "Note: including file: ")
+    add_compile_options(/Zc:__cplusplus)
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_subdirectory(node)
+# --- Node.js Source Build via FetchContent ---
+include(FetchContent)
+FetchContent_Declare(
+    nodejs
+    GIT_REPOSITORY https://github.com/nodejs/node.git
+    GIT_TAG        v24.13.1
+    GIT_PROGRESS   TRUE
+    SOURCE_DIR     "${CMAKE_CURRENT_SOURCE_DIR}/node"
+)
+
+# Populate first to get source directory
+FetchContent_GetProperties(nodejs)
+if(NOT nodejs_POPULATED)
+    message(STATUS "Fetching Node.js v24.13.1...")
+    FetchContent_Populate(nodejs)
+endif()
+
+set(NODE_SOURCE_DIR "${nodejs_SOURCE_DIR}")
+set(NODE_BINARY_DIR "${nodejs_BINARY_DIR}") # Not strictly used as we build in source for Node
+
+# Define expected outputs
+if(WIN32)
+    # Determine build type and set arguments/paths accordingly
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(NODE_BUILD_ARGS dll debug)
+        set(NODE_OUTPUT_DIR "${NODE_SOURCE_DIR}/out/Debug")
+    else()
+        set(NODE_BUILD_ARGS dll release)
+        set(NODE_OUTPUT_DIR "${NODE_SOURCE_DIR}/out/Release")
+    endif()
+
+    set(NODE_LIB "${NODE_OUTPUT_DIR}/libnode.lib")
+    set(NODE_DLL "${NODE_OUTPUT_DIR}/libnode.dll")
+
+    # Environment Handling for Windows
+    # We use vswhere.exe to find the Visual Studio installation path
+    find_program(VSWHERE_EXE vswhere.exe
+        HINTS
+        "$ENV{ProgramFiles\(x86\)}/Microsoft Visual Studio/Installer"
+        "$ENV{ProgramFiles}/Microsoft Visual Studio/Installer"
+    )
+
+    if(VSWHERE_EXE)
+        execute_process(
+            COMMAND "${VSWHERE_EXE}" -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            OUTPUT_VARIABLE VS_INSTALL_PATH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(VS_INSTALL_PATH)
+            file(TO_CMAKE_PATH "${VS_INSTALL_PATH}" VS_INSTALL_PATH)
+            message(STATUS "Found Visual Studio at: ${VS_INSTALL_PATH}")
+            set(VCVARSALL_BAT "${VS_INSTALL_PATH}/VC/Auxiliary/Build/vcvarsall.bat")
+        endif()
+    endif()
+
+    if(EXISTS "${VCVARSALL_BAT}")
+        # If found, wrap execution in environment setup
+        # Note: vcvarsall.bat changes cwd, so we push/pop or use &&
+        # We also check if the library already exists to avoid re-running the expensive build
+        
+        file(TO_NATIVE_PATH "${VCVARSALL_BAT}" VCVARSALL_BAT_NATIVE)
+        file(TO_NATIVE_PATH "${VCVARSALL_BAT}" VCVARSALL_BAT_NATIVE)
+        file(TO_NATIVE_PATH "${NODE_LIB}" NODE_LIB_NATIVE)
+        file(TO_NATIVE_PATH "${NODE_DLL}" NODE_DLL_NATIVE)
+
+        # Windows command line handling for nested quotes is terrible.
+        # We construct a command that checks existence and then calls the build script.
+        # Check both LIB and DLL. If either is missing, we must build.
+        # Logic: if exist LIB (if exist DLL (skip) else (BUILD)) else (BUILD)
+        # Note: We rely on the parent environment (build.bat) to have set up MSVC environment.
+        set(BUILD_CMD 
+            cmd /c if exist "${NODE_LIB_NATIVE}" (
+                if exist "${NODE_DLL_NATIVE}" (
+                    echo "Node.js library found, skipping build"
+                ) else (
+                    call vcbuild.bat ${NODE_BUILD_ARGS}
+                )
+            ) else (
+                call vcbuild.bat ${NODE_BUILD_ARGS}
+            )
+        )
+    else()
+        message(WARNING "vcvarsall.bat not found. Trying direct execution.")
+        # Fallback to direct execution, hoping user has environment
+        file(TO_NATIVE_PATH "${NODE_LIB}" NODE_LIB_NATIVE)
+        set(BUILD_CMD cmd /c "if not exist ${NODE_LIB_NATIVE} (vcbuild.bat ${NODE_BUILD_ARGS}) else (echo Node.js library found, skipping build)")
+    endif()
+    
+else()
+    set(NODE_LIB "${NODE_SOURCE_DIR}/out/Release/libnode.so")
+    set(NODE_DLL "${NODE_LIB}")
+    
+    include(ProcessorCount)
+    ProcessorCount(N)
+    
+    # Linux build command
+    set(BUILD_CMD /bin/bash -c "./configure --shared && make -j${N}")
+endif()
+
+# Define Custom Build Target
+# We use a stamp file to avoid rebuilding every time
+set(NODE_BUILD_STAMP "${CMAKE_CURRENT_BINARY_DIR}/node_build.stamp")
+
+add_custom_command(
+    OUTPUT ${NODE_BUILD_STAMP} ${NODE_LIB} ${NODE_DLL}
+    COMMAND ${BUILD_CMD}
+    COMMAND ${CMAKE_COMMAND} -E touch ${NODE_BUILD_STAMP}
+    WORKING_DIRECTORY ${NODE_SOURCE_DIR}
+    COMMENT "Building Node.js from source (${NODE_SOURCE_DIR})..."
+    VERBATIM
+    USES_TERMINAL
+)
+
+add_custom_target(build_nodejs DEPENDS ${NODE_BUILD_STAMP})
+
+# Interface library for consumers
+add_library(nodejs_deps INTERFACE)
+target_include_directories(nodejs_deps INTERFACE
+    ${NODE_SOURCE_DIR}/src
+    ${NODE_SOURCE_DIR}/deps/v8/include
+    ${NODE_SOURCE_DIR}/deps/uv/include
+)
+
+# On Windows, link against node.lib. On Linux, libnode.so
+target_link_libraries(nodejs_deps INTERFACE ${NODE_LIB})
+
+# Add required macros for V8 shared library usage and pointer compression
+target_compile_definitions(nodejs_deps INTERFACE
+    V8_COMPRESS_POINTERS=1
+    V8_31BIT_SMIS_ON_64BIT_ARCH=1
+)
+
+if(WIN32)
+    target_compile_definitions(nodejs_deps INTERFACE USING_V8_SHARED=1 BUILDING_NODE_EXTENSION=1)
+endif()
+
+add_dependencies(nodejs_deps build_nodejs)
+
+
+# --- FCT_Node Library ---
 
 file(GLOB FCT_NODE_HEADERS
         "src/*.h"
         "src/*.hpp"
 )
-
 list(REMOVE_ITEM FCT_NODE_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/src/FCT_Node.h")
 
 add_library(FCT_Node STATIC
@@ -28,200 +182,27 @@ add_library(FCT_Node STATIC
 )
 
 target_include_directories(FCT_Node PUBLIC
-        ${NODE_INCLUDE_DIR}
-        ${V8_INCLUDE_DIR}
-        ${UV_INCLUDE_DIR}
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 )
 
-target_link_libraries(FCT_Node PUBLIC
-        nodejs_deps
-)
+target_link_libraries(FCT_Node PUBLIC nodejs_deps)
 set_utf8_for_target(FCT_Node)
+
+if(MSVC)
+    target_compile_options(FCT_Node PRIVATE /wd4251 /wd4275)
+endif()
 
 add_copy_target_headers(FCT_Node "${FCT_NODE_HEADERS}")
 
-if(DEFINED NODE_LIB_DIR)
-    set(NODE_LIB_DIR ${NODE_LIB_DIR} PARENT_SCOPE)
-endif()
-
-add_custom_target(export_all ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/FCT_Node/Include/FCT_Node"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/FCT_Node/Lib"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/FCT_Node/Bin"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/V8_Headers/Include"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/UV_Headers/Include"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/Node_Headers/Include"
-        COMMENT "Creating export directory structure"
-)
-
-if(FCT_NODE_HEADERS)
-    add_custom_command(TARGET export_all POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${FCT_NODE_HEADERS}
-            "${CMAKE_BINARY_DIR}/export/FCT_Node/Include/FCT_Node/"
-            COMMENT "Copying FCT_Node headers to export/FCT_Node/Include"
-            VERBATIM
-    )
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/FCT_Node.h")
-    add_custom_command(TARGET export_all POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/FCT_Node.h"
-            "${CMAKE_BINARY_DIR}/export/FCT_Node/Include/"
-            COMMENT "Copying FCT_Node.h to export root directory"
-            VERBATIM
-    )
-endif()
-
-
-add_custom_command(TARGET export_all POST_BUILD
+# Copy DLL for tests/executables
+if(WIN32)
+    add_custom_command(TARGET FCT_Node POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE:FCT_Node>"
-        "${CMAKE_BINARY_DIR}/export/FCT_Node/Lib/"
-        COMMENT "Copying FCT_Node library to export/FCT_Node/Lib"
-)
-
-if(DEFINED NODE_INCLUDE_DIR AND EXISTS "${NODE_INCLUDE_DIR}")
-    file(GLOB_RECURSE NODE_HEADER_FILES
-            "${NODE_INCLUDE_DIR}/*.h"
-            "${NODE_INCLUDE_DIR}/*.hpp"
-            "${NODE_INCLUDE_DIR}/*.hxx"
-            "${NODE_INCLUDE_DIR}/*.inl"
-    )
-
-    if(NODE_HEADER_FILES)
-        add_custom_command(TARGET export_all POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/Node_Headers/Include"
-                COMMENT "Creating Node_Headers/Include directory"
-        )
-
-        foreach(HEADER_FILE ${NODE_HEADER_FILES})
-            file(RELATIVE_PATH REL_PATH "${NODE_INCLUDE_DIR}" "${HEADER_FILE}")
-            get_filename_component(REL_DIR "${REL_PATH}" DIRECTORY)
-
-            add_custom_command(TARGET export_all POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/export/Node_Headers/Include/${REL_DIR}"
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${HEADER_FILE}"
-                    "${CMAKE_BINARY_DIR}/export/Node_Headers/Include/${REL_PATH}"
-                    COMMENT "Copying Node header: ${REL_PATH}"
-            )
-        endforeach()
-    endif()
-endif()
-
-if(DEFINED V8_INCLUDE_DIR AND EXISTS "${V8_INCLUDE_DIR}")
-    add_custom_command(TARGET export_all POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${V8_INCLUDE_DIR}"
-            "${CMAKE_BINARY_DIR}/export/V8_Headers/Include"
-            COMMENT "Copying V8 headers to export/V8_Headers/Include"
+        "${NODE_DLL}"
+        $<TARGET_FILE_DIR:FCT_Node>
     )
 endif()
 
-if(DEFINED UV_INCLUDE_DIR AND EXISTS "${UV_INCLUDE_DIR}")
-    add_custom_command(TARGET export_all POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${UV_INCLUDE_DIR}"
-            "${CMAKE_BINARY_DIR}/export/UV_Headers/Include"
-            COMMENT "Copying UV headers to export/UV_Headers/Include"
-    )
-endif()
-
-if(DEFINED NODE_LIB_DIR AND EXISTS "${NODE_LIB_DIR}/libnode.dll")
-    add_custom_command(TARGET export_all POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${NODE_LIB_DIR}/libnode.dll"
-            "${CMAKE_BINARY_DIR}/export/FCT_Node/Bin/"
-            COMMENT "Copying libnode.dll to export/FCT_Node/Bin"
-    )
-endif()
-
-if(DEFINED NODE_LIB_DIR AND EXISTS "${NODE_LIB_DIR}/libnode.lib")
-    add_custom_command(TARGET export_all POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${NODE_LIB_DIR}/libnode.lib"
-            "${CMAKE_BINARY_DIR}/export/FCT_Node/Lib/"
-            COMMENT "Copying libnode.lib to export/FCT_Node/Lib"
-    )
-endif()
-
-if(DEFINED NODE_DEPS_LIB_DIR AND EXISTS "${NODE_DEPS_LIB_DIR}")
-    add_custom_command(TARGET export_all POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${NODE_DEPS_LIB_DIR}"
-            "${CMAKE_BINARY_DIR}/export/FCT_Node/Lib/"
-            COMMENT "Copying Node dependencies libraries to export/FCT_Node/Lib"
-    )
-endif()
-
-add_dependencies(export_all FCT_Node)
-
-message(STATUS "Export will be created at: ${CMAKE_BINARY_DIR}/export")
-message(STATUS "V8_INCLUDE_DIR: ${V8_INCLUDE_DIR}")
-message(STATUS "UV_INCLUDE_DIR: ${UV_INCLUDE_DIR}")
-message(STATUS "NODE_LIB_DIR: ${NODE_LIB_DIR}")
-message(STATUS "NODE_DEPS_LIB_DIR: ${NODE_DEPS_LIB_DIR}")
-
-function(configure_fct_node_target target_name)
-    if(NOT TARGET ${target_name})
-        message(FATAL_ERROR "Target ${target_name} does not exist")
-    endif()
-
-    target_link_libraries(${target_name} PUBLIC FCT_Node)
-
-    if(DEFINED NODE_LIB_DIR)
-        if(WIN32)
-            set(NODE_SHARED_LIB_NAME "libnode.dll")
-        elseif(APPLE)
-
-        else()
-            set(NODE_SHARED_LIB_NAME "libnode.so")
-        endif()
-
-        if(EXISTS "${NODE_LIB_DIR}/${NODE_SHARED_LIB_NAME}")
-            add_custom_command(TARGET ${target_name} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${NODE_LIB_DIR}/${NODE_SHARED_LIB_NAME}"
-                    $<TARGET_FILE_DIR:${target_name}>
-                    COMMENT "Copying ${NODE_SHARED_LIB_NAME} for ${target_name}"
-            )
-        endif()
-    endif()
-
-    message(STATUS "Configured FCT_Node for target: ${target_name}")
-endfunction()
-
-function(target_link_fct_node_libraries target_name)
-    if(NOT TARGET ${target_name})
-        message(FATAL_ERROR "Target ${target_name} does not exist")
-    endif()
-
-    target_link_libraries(${target_name} FCT_Node)
-
-    if(DEFINED NODE_LIB_DIR)
-        if(WIN32)
-            set(NODE_SHARED_LIB_NAME "libnode.dll")
-        elseif(APPLE)
-
-        else()
-            set(NODE_SHARED_LIB_NAME "libnode.so")
-        endif()
-
-        if(EXISTS "${NODE_LIB_DIR}/${NODE_SHARED_LIB_NAME}")
-            add_custom_command(TARGET ${target_name} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${NODE_LIB_DIR}/${NODE_SHARED_LIB_NAME}"
-                    $<TARGET_FILE_DIR:${target_name}>
-                    COMMENT "Copying ${NODE_SHARED_LIB_NAME} for ${target_name}"
-            )
-        endif()
-    endif()
-
-    message(STATUS "Configured FCT_Node for target: ${target_name}")
-endfunction()
-
+# Tests
 add_subdirectory(tests)
-

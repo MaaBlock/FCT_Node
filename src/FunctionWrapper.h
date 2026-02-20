@@ -31,13 +31,7 @@ namespace FCT
     private:
         template<std::size_t... I>
         auto callWithArgs(const v8::FunctionCallbackInfo<v8::Value>& args,
-                         std::index_sequence<I...>) {
-            if constexpr (std::is_void_v<ReturnType>) {
-                m_function(convertFromJS<Args>(m_env, args[I])...);
-            } else {
-                return m_function(convertFromJS<Args>(m_env, args[I])...);
-            }
-        }
+                         std::index_sequence<I...>);
     };
 
 

@@ -10,7 +10,7 @@
 #ifndef NODEENVIRONMENT_H
 #define NODEENVIRONMENT_H
 #include "FunctionWrapper.h"
-
+#include "ThirdParty.h"
 #include "JSObject.h"
 namespace FCT {
     class JSPromise;

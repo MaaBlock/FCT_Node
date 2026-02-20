@@ -40,6 +40,7 @@ namespace FCT {
         bool m_isCreator;
 
     public:
+        JSPromise() : m_isolate(nullptr), m_env(nullptr), m_isCreator(false) {}
         JSPromise(NodeEnvironment* env, v8::Isolate* isolate);
 
         JSPromise(NodeEnvironment* env, v8::Isolate* isolate, v8::Local<v8::Promise> promise);

@@ -10,7 +10,7 @@
 #include <node_buffer.h>
 #include <node_builtins.h>
 #include <node_errors.h>
-#include <node_internals.h>
+//#include <node_internals.h>
 #include <node_object_wrap.h>
 #include <node_options-inl.h>
 #include <node_options.h>

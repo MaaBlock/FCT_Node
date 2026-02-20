@@ -23,6 +23,7 @@ namespace FCT {
         v8::Global<v8::Value> m_value;
         NodeEnvironment* m_env;
     public:
+        JSAny() : m_isolate(nullptr), m_env(nullptr) {}
         JSAny(NodeEnvironment* env, v8::Isolate* isolate, v8::Global<v8::Value> value);
         JSAny(NodeEnvironment* env, v8::Isolate* isolate, v8::Local<v8::Value> value);
 

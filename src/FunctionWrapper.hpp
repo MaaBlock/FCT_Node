@@ -36,5 +36,16 @@ namespace FCT {
                 v8::String::NewFromUtf8(isolate, e.what()).ToLocalChecked()));
         }
     }
+
+    template<typename ReturnType, typename... Args>
+    template<std::size_t... I>
+    auto FunctionWrapper<ReturnType, Args...>::callWithArgs(const v8::FunctionCallbackInfo<v8::Value>& args,
+                                                           std::index_sequence<I...>) {
+        if constexpr (std::is_void_v<ReturnType>) {
+            m_function(convertFromJS<Args>(m_env, args[I])...);
+        } else {
+            return m_function(convertFromJS<Args>(m_env, args[I])...);
+        }
+    }
 }
 #endif

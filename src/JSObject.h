@@ -9,6 +9,13 @@
 
 #ifndef JSOBJECT_H
 #define JSOBJECT_H
+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <memory>
+#include "ThirdParty.h"
+
 namespace FCT {
     class NodeEnvironment;
     /**
@@ -23,6 +30,7 @@ namespace FCT {
         v8::Global<v8::Object> m_object;
         NodeEnvironment* m_env;
     public:
+        JSObject() : m_isolate(nullptr), m_env(nullptr) {}
         JSObject(NodeEnvironment* env,v8::Isolate* isolate, v8::Global<v8::Object> object);
         JSObject(NodeEnvironment* env,v8::Isolate* isolate, v8::Local<v8::Object> object);
 
@@ -142,5 +150,4 @@ namespace FCT {
         ReturnType call(const std::string& funcName, Args... args);
     };
 } // FCT
-
 #endif //JSOBJECT_H

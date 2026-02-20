@@ -1,3 +1,4 @@
 .vs/
 include/
 node_modules/
+build/

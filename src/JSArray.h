@@ -13,6 +13,7 @@ namespace FCT
         NodeEnvironment* m_env;
 
     public:
+        JSArray() : m_isolate(nullptr), m_env(nullptr) {}
         JSArray(NodeEnvironment* env, v8::Isolate* isolate, v8::Global<v8::Array> array)
             : m_env(env), m_isolate(isolate), m_array(std::move(array)) {}
 
@@ -93,7 +94,7 @@ namespace FCT
             v8::Local<v8::Context> context = m_isolate->GetCurrentContext();
             v8::Local<v8::Array> arr = getLocalArray();
 
-            v8::Local<v8::Value> jsValue = convertToJS(m_isolate, value);
+            v8::Local<v8::Value> jsValue = convertToJS(*m_env, value);
             return arr->Set(context, index, jsValue).FromMaybe(false);
         }
         /**

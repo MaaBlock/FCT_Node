@@ -142,6 +142,12 @@ namespace FCT
         return v8::Boolean::New(env.isolate(), arg);
     }
 
+    // JSObject specialization
+    template<>
+    inline v8::Local<v8::Value> convertToJS<JSObject>(NodeEnvironment& env, const JSObject& arg) {
+        return arg.getLocalObject();
+    }
+
     template<>
     inline v8::Local<v8::Value> convertToJS<std::vector<std::string>>(NodeEnvironment& env, const std::vector<std::string>& arg) {
         v8::Local<v8::Array> array = v8::Array::New(env.isolate(), static_cast<int>(arg.size()));

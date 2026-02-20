@@ -42,11 +42,6 @@ namespace FCT
         return obj->Set(context, key, jsValue).FromMaybe(false);
     }
 
-    template<>
-    inline v8::Local<v8::Value> convertToJS<JSObject>(NodeEnvironment& isolate, const JSObject& arg) {
-        return arg.getLocalObject();
-    }
-
     template<typename ReturnType, typename... Args>
     ReturnType JSObject::call(const std::string& funcName, Args... args) {
         v8::Isolate* isolate = m_isolate;

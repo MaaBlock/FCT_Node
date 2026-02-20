@@ -64,6 +64,7 @@ namespace FCT {
 
         static void Init()
         {
+            if (g_platform) return;
             auto args = std::vector<std::string>();
             args.push_back("FCTApp");
             std::shared_ptr<node::InitializationResult> result =

@@ -1,0 +1,73 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup VCPKG
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git
+        .\vcpkg\bootstrap-vcpkg.bat
+        echo "VCPKG_ROOT=$PWD\vcpkg" >> $env:GITHUB_ENV
+
+    - name: Install Dependencies
+      run: |
+        .\vcpkg\vcpkg install gtest:x64-windows
+
+    - name: Configure CMake
+      run: cmake -B build -S .
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Run Tests
+      working-directory: build/tests/Release
+      run: |
+        .\InteropTest.exe
+        .\ExtendedTests.exe
+
+  build-linux:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup GCC 13
+      run: |
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+        sudo apt-get update
+        sudo apt-get install -y gcc-13 g++-13 ninja-build
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 130 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+
+    - name: Setup VCPKG
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git
+        if [ -f vcpkg/bootstrap-vcpkg.sh ]; then
+          ./vcpkg/bootstrap-vcpkg.sh
+        else
+          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+        fi
+        echo "VCPKG_ROOT=$PWD/vcpkg" >> $GITHUB_ENV
+
+    - name: Install Dependencies
+      run: |
+        $VCPKG_ROOT/vcpkg install gtest
+
+    - name: Configure CMake
+      run: cmake -B build -S . -GNinja -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Run Tests
+      working-directory: build/tests
+      run: |
+        ./InteropTest
+        ./ExtendedTests
