@@ -122,12 +122,14 @@ else()
     set(BUILD_CMD /bin/bash -c "./configure --shared && make -j${N}")
 endif()
 
-# Define Custom Build Target
-# We use a stamp file to avoid rebuilding every time
-set(NODE_BUILD_STAMP "${CMAKE_CURRENT_BINARY_DIR}/node_build.stamp")
+# Define outputs to avoid duplicate rules on Linux where libnode.so is both LIB and DLL
+set(NODE_ALL_OUTPUTS ${NODE_BUILD_STAMP} ${NODE_LIB})
+if(NOT NODE_LIB STREQUAL NODE_DLL)
+    list(APPEND NODE_ALL_OUTPUTS ${NODE_DLL})
+endif()
 
 add_custom_command(
-    OUTPUT ${NODE_BUILD_STAMP} ${NODE_LIB} ${NODE_DLL}
+    OUTPUT ${NODE_ALL_OUTPUTS}
     COMMAND ${BUILD_CMD}
     COMMAND ${CMAKE_COMMAND} -E touch ${NODE_BUILD_STAMP}
     WORKING_DIRECTORY ${NODE_SOURCE_DIR}
