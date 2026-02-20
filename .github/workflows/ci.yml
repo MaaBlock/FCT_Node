@@ -18,10 +18,6 @@ jobs:
         .\vcpkg\bootstrap-vcpkg.bat
         echo "VCPKG_ROOT=$PWD\vcpkg" >> $env:GITHUB_ENV
 
-    - name: Install Dependencies
-      run: |
-        .\vcpkg\vcpkg install gtest:x64-windows
-
     - name: Configure CMake
       run: cmake -B build -S .
 
@@ -29,10 +25,10 @@ jobs:
       run: cmake --build build --config Release
 
     - name: Run Tests
-      working-directory: build/tests/Release
+      working-directory: build/tests
       run: |
-        .\InteropTest.exe
-        .\ExtendedTests.exe
+        .\Release\InteropTest.exe
+        .\Release\ExtendedTests.exe
 
   build-linux:
     runs-on: ubuntu-20.04
@@ -55,10 +51,6 @@ jobs:
           ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
         fi
         echo "VCPKG_ROOT=$PWD/vcpkg" >> $GITHUB_ENV
-
-    - name: Install Dependencies
-      run: |
-        $VCPKG_ROOT/vcpkg install gtest
 
     - name: Configure CMake
       run: cmake -B build -S . -GNinja -DCMAKE_BUILD_TYPE=Release
