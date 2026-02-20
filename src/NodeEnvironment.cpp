@@ -286,7 +286,7 @@ globalThis.require = publicRequire;
         }
 
         if (m_isolate) {
-            m_isolate->Dispose();
+            NodeCommon::GetPlatform()->DisposeIsolate(m_isolate);
             m_isolate = nullptr;
         }
 
