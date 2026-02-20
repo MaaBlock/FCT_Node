@@ -30,26 +30,23 @@ jobs:
         .\Release\InteropTest.exe
         .\Release\ExtendedTests.exe
 
-  build-linux:
-    runs-on: ubuntu-20.04
+  build-linux-x64:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Setup GCC 13
+    - name: Install System Dependencies
       run: |
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-        sudo apt-get update
-        sudo apt-get install -y gcc-13 g++-13 ninja-build
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 130 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+        apt-get update
+        apt-get install -y git cmake ninja-build g++-10 python3 make curl zip unzip tar pkg-config perl
+        update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100 --slave /usr/bin/g++ g++ /usr/bin/g++-10
+
+    - uses: actions/checkout@v4
 
     - name: Setup VCPKG
       run: |
         git clone https://github.com/microsoft/vcpkg.git
-        if [ -f vcpkg/bootstrap-vcpkg.sh ]; then
-          ./vcpkg/bootstrap-vcpkg.sh
-        else
-          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
-        fi
+        ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
         echo "VCPKG_ROOT=$PWD/vcpkg" >> $GITHUB_ENV
 
     - name: Configure CMake
@@ -63,3 +60,27 @@ jobs:
       run: |
         ./InteropTest
         ./ExtendedTests
+
+  build-linux-arm64:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Build and Test in ARM64 Docker
+      run: |
+        docker run --rm --platform linux/arm64 -v ${{ github.workspace }}:/workspace -w /workspace ubuntu:20.04 bash -c "
+          apt-get update && \
+          apt-get install -y git cmake ninja-build g++-10 python3 make curl zip unzip tar pkg-config perl && \
+          update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100 --slave /usr/bin/g++ g++ /usr/bin/g++-10 && \
+          git clone https://github.com/microsoft/vcpkg.git && \
+          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics && \
+          export VCPKG_ROOT=\$PWD/vcpkg && \
+          cmake -B build -S . -GNinja -DCMAKE_BUILD_TYPE=Release && \
+          cmake --build build && \
+          cd build/tests && \
+          ./InteropTest && \
+          ./ExtendedTests
+        "
