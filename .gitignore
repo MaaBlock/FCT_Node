@@ -2,3 +2,5 @@
 include/
 node_modules/
 build/
+cmake-build-debug
+node
