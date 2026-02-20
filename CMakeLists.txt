@@ -149,11 +149,8 @@ target_include_directories(nodejs_deps INTERFACE
 # On Windows, link against node.lib. On Linux, libnode.so
 target_link_libraries(nodejs_deps INTERFACE ${NODE_LIB})
 
-# Add required macros for V8 shared library usage and pointer compression
-target_compile_definitions(nodejs_deps INTERFACE
-    V8_COMPRESS_POINTERS=1
-    V8_31BIT_SMIS_ON_64BIT_ARCH=1
-)
+# Add required macros for V8 shared library usage
+target_compile_definitions(nodejs_deps INTERFACE)
 
 if(WIN32)
     target_compile_definitions(nodejs_deps INTERFACE USING_V8_SHARED=1 BUILDING_NODE_EXTENSION=1)
