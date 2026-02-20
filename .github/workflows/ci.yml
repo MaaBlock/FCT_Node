@@ -2,9 +2,9 @@ name: Build and Test
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "dev", "feat/*" ]
   pull_request:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "dev", "feat/*" ]
 
 jobs:
   build-windows:

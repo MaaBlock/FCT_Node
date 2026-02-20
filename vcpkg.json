@@ -1,7 +1,0 @@
-{
-  "name": "fct-node",
-  "version": "0.1.0",
-  "dependencies": [
-    "gtest"
-  ]
-}
