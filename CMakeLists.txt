@@ -122,6 +122,10 @@ else()
     set(BUILD_CMD /bin/bash -c "./configure --shared && make -j${N}")
 endif()
 
+# Define Custom Build Target
+# We use a stamp file to avoid rebuilding every time
+set(NODE_BUILD_STAMP "${CMAKE_CURRENT_BINARY_DIR}/node_build.stamp")
+
 # Define outputs to avoid duplicate rules on Linux where libnode.so is both LIB and DLL
 set(NODE_ALL_OUTPUTS ${NODE_BUILD_STAMP} ${NODE_LIB})
 if(NOT NODE_LIB STREQUAL NODE_DLL)
@@ -138,7 +142,21 @@ add_custom_command(
     USES_TERMINAL
 )
 
-add_custom_target(build_nodejs DEPENDS ${NODE_BUILD_STAMP})
+# Make the custom target depend on ALL outputs to ensure they exist for downstream consumers
+add_custom_target(build_nodejs DEPENDS ${NODE_ALL_OUTPUTS})
+
+# Define an IMPORTED target to allow downstream targets in other directories to see the dependency
+add_library(libnode_imported SHARED IMPORTED GLOBAL)
+add_dependencies(libnode_imported build_nodejs)
+
+set_target_properties(libnode_imported PROPERTIES
+    IMPORTED_LOCATION "${NODE_DLL}"
+)
+if(WIN32)
+    set_target_properties(libnode_imported PROPERTIES
+        IMPORTED_IMPLIB "${NODE_LIB}"
+    )
+endif()
 
 # Interface library for consumers
 add_library(nodejs_deps INTERFACE)
@@ -148,8 +166,8 @@ target_include_directories(nodejs_deps INTERFACE
     ${NODE_SOURCE_DIR}/deps/uv/include
 )
 
-# On Windows, link against node.lib. On Linux, libnode.so
-target_link_libraries(nodejs_deps INTERFACE ${NODE_LIB})
+# Link against the imported target to ensure build ordering and visibility
+target_link_libraries(nodejs_deps INTERFACE libnode_imported)
 
 # Add required macros for V8 shared library usage
 target_compile_definitions(nodejs_deps INTERFACE)
@@ -198,7 +216,7 @@ add_copy_target_headers(FCT_Node "${FCT_NODE_HEADERS}")
 if(WIN32)
     add_custom_command(TARGET FCT_Node POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${NODE_DLL}"
+        $<TARGET_FILE:libnode_imported>
         $<TARGET_FILE_DIR:FCT_Node>
     )
 endif()
