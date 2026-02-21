@@ -28,7 +28,6 @@ int main()
     cout << "Tests path exists: " << std::filesystem::exists(tests_path) << endl;
 
     env.addModulePath("./CusstomModulePath/node_modules");
-    wcout.imbue(locale(".UTF-8"));
     env.setup();
     env.excuteScript(R"(
 const Module = require('module');
