@@ -40,7 +40,7 @@ jobs:
     - name: Install System Dependencies
       run: |
         apt-get update
-        apt-get install -y software-properties-common
+        apt-get install -y software-properties-common gnupg ca-certificates
         add-apt-repository ppa:deadsnakes/ppa -y
         apt-get update
         apt-get install -y git cmake ninja-build g++-10 python3.11 python3.11-dev make curl zip unzip tar pkg-config perl
@@ -79,7 +79,7 @@ jobs:
       run: |
         docker run --rm --platform linux/arm64 -e DEBIAN_FRONTEND=noninteractive -v ${{ github.workspace }}:/workspace -w /workspace ubuntu:20.04 bash -c "
           apt-get update && \
-          apt-get install -y software-properties-common && \
+          apt-get install -y software-properties-common gnupg ca-certificates && \
           add-apt-repository ppa:deadsnakes/ppa -y && \
           apt-get update && \
           apt-get install -y git cmake ninja-build g++-10 python3.11 python3.11-dev make curl zip unzip tar pkg-config perl && \
