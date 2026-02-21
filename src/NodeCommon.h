@@ -88,7 +88,7 @@ namespace FCT {
             v8::V8::Initialize();
             g_platform = std::move(platform);
 
-            printf("");
+
         }
         /*
         static void Init()
