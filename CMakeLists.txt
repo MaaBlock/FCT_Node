@@ -119,7 +119,7 @@ else()
     ProcessorCount(N)
     
     # Linux build command
-    set(BUILD_CMD /bin/bash -c "./configure --shared && make -j${N}")
+    set(BUILD_CMD /bin/bash -c "./configure --shared && make -j${N} && ln -sf out/Release/libnode.so.* out/Release/libnode.so")
 endif()
 
 # Define Custom Build Target
