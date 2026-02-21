@@ -69,30 +69,42 @@ jobs:
         ./ExtendedTests
 
   build-linux-arm64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm64
+    container:
+      image: ubuntu:20.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
+    - name: Install System Dependencies
+      run: |
+        apt-get update
+        apt-get install -y software-properties-common gnupg ca-certificates
+        add-apt-repository ppa:deadsnakes/ppa -y
+        add-apt-repository ppa:ubuntu-toolchain-r/test -y
+        apt-get update
+        apt-get install -y git cmake ninja-build gcc-13 g++-13 python3.9 python3.9-dev make curl zip unzip tar pkg-config perl
+        update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+        update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 100
+
     - uses: actions/checkout@v4
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-
-    - name: Build and Test in ARM64 Docker
+    - name: Setup VCPKG
       run: |
-        docker run --rm --platform linux/arm64 -e DEBIAN_FRONTEND=noninteractive -v ${{ github.workspace }}:/workspace -w /workspace ubuntu:20.04 bash -c "
-          apt-get update && \
-          apt-get install -y software-properties-common gnupg ca-certificates && \
-          add-apt-repository ppa:deadsnakes/ppa -y && \
-          add-apt-repository ppa:ubuntu-toolchain-r/test -y && \
-          apt-get update && \
-          apt-get install -y git cmake ninja-build gcc-13 g++-13 python3.9 python3.9-dev make curl zip unzip tar pkg-config perl && \
-          update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13 && \
-          update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 100 && \
-          git clone https://github.com/microsoft/vcpkg.git && \
-          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics && \
-          export VCPKG_ROOT=\$PWD/vcpkg && \
-          cmake -B build -S . -GNinja -DCMAKE_BUILD_TYPE=Release && \
-          cmake --build build && \
-          cd build/tests && \
-          ./InteropTest && \
-          ./ExtendedTests
-        "
+        git clone https://github.com/microsoft/vcpkg.git
+        ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+        echo "VCPKG_ROOT=$PWD/vcpkg" >> $GITHUB_ENV
+
+    - name: Configure CMake
+      run: cmake -B build -S . -GNinja -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Run Tests
+      working-directory: build/tests
+      run: |
+        ./InteropTest
+        ./ExtendedTests
+        ./PromiseTest
+        ./StressTest
+        ./CustomModulePathTest
