@@ -171,6 +171,7 @@ function(configure_fct_node_target target_name)
     endif()
 
     target_link_libraries(${target_name} PUBLIC FCT_Node)
+    set_utf8_for_target(${target_name})
 
     if(DEFINED NODE_LIB_DIR)
         if(WIN32)

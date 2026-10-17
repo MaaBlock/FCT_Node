@@ -1,11 +1,3 @@
-/**
- * @file JSAny.hpp
- * @brief Template implementations for JSAny class
- * @details This file contains template method implementations and type conversion
- *          specializations for the JSAny class.
- * @author FCT Team
- */
-
 #ifndef JSANY_HPP
 #define JSANY_HPP
 
@@ -19,7 +11,7 @@ namespace FCT {
     template<typename T>
     T JSAny::as() const {
         if (m_value.IsEmpty()) {
-            return T{}; // 返回默认值
+            return T{};
         }
         v8::Locker locker(m_isolate);
         v8::HandleScope scope(m_isolate);
@@ -29,7 +21,6 @@ namespace FCT {
     template<typename T>
     T JSAny::to() const {
         if (m_value.IsEmpty()) {
-            // 对于没有默认构造函数的类型，直接抛出异常
             throw std::runtime_error("Cannot convert empty JSAny to target type");
         }
         v8::Locker locker(m_isolate);
@@ -43,6 +34,6 @@ namespace FCT {
         return arg.value();
     }
     
-} // FCT
+} // namespace FCT
 
-#endif //JSANY_HPP
+#endif // JSANY_HPP
